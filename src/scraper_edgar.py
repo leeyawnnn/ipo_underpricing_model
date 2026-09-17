@@ -172,46 +172,73 @@ def lookup_cik(ticker: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _filing_rows(block: dict) -> list[tuple[str, str, str, str]]:
+    """Return (form, date, accession, primary document) tuples from a filings block."""
+    return list(
+        zip(
+            block.get("form", []),
+            block.get("filingDate", []),
+            block.get("accessionNumber", []),
+            block.get("primaryDocument", []),
+        )
+    )
+
+
 def find_s1_filing(cik: str, before_date: str) -> dict | None:
-    """Find the most recent S-1 or S-1/A filing for a company before a date.
+    """Find the latest S-1 / F-1 or amendment filed before *before_date*.
+
+    The submissions endpoint puts only the most recent filings in
+    ``filings.recent`` and pages the rest into separate JSON shards listed
+    under ``filings.files``. An earlier version read ``recent`` alone, so a
+    registrant that has filed prolifically since its IPO — which is most of
+    them by 2026 — could have its S-1 pushed out of the window and be recorded
+    as having no filing at all. The shards are now followed when ``recent``
+    yields nothing.
+
+    The *latest* qualifying filing is returned, which is the final
+    pre-effective amendment: the version of the prospectus closest to the one
+    investors actually priced against.
 
     Args:
         cik: Zero-padded 10-digit CIK string.
-        before_date: ISO date string (``YYYY-MM-DD``); only filings before
-            this date are considered.
+        before_date: ISO date string (``YYYY-MM-DD``); only filings strictly
+            before this date are considered.
 
     Returns:
-        Dict with keys ``accession_number``, ``filing_date``, ``form_type``,
-        and ``primary_doc`` — or ``None`` if no filing is found.
+        Dict with ``accession_number``, ``filing_date``, ``form_type`` and
+        ``primary_doc``, or ``None`` if nothing qualifies.
     """
+    wanted = ("S-1", "S-1/A", "F-1", "F-1/A")
+
+    def qualifying(rows: list[tuple[str, str, str, str]]) -> list[dict]:
+        return [
+            {
+                "form_type": form,
+                "filing_date": date,
+                "accession_number": accession,
+                "primary_doc": document,
+            }
+            for form, date, accession, document in rows
+            if form in wanted and date < before_date and document
+        ]
+
     try:
-        url = EDGAR_SUBMISSIONS_URL.format(cik=int(cik))
-        resp = _get(url)
-        submissions = resp.json()
+        submissions = _get(EDGAR_SUBMISSIONS_URL.format(cik=int(cik))).json()
+        filings = submissions.get("filings", {})
+        candidates = qualifying(_filing_rows(filings.get("recent", {})))
 
-        filings = submissions.get("filings", {}).get("recent", {})
-        forms = filings.get("form", [])
-        dates = filings.get("filingDate", [])
-        accessions = filings.get("accessionNumber", [])
-        primary_docs = filings.get("primaryDocument", [])
-
-        candidates = []
-        for form, date, acc, doc in zip(forms, dates, accessions, primary_docs):
-            if form in ("S-1", "S-1/A", "F-1", "F-1/A") and date < before_date:
-                candidates.append(
-                    {
-                        "form_type": form,
-                        "filing_date": date,
-                        "accession_number": acc,
-                        "primary_doc": doc,
-                    }
-                )
+        if not candidates:
+            for shard in filings.get("files", []):
+                name = shard.get("name")
+                if not name:
+                    continue
+                shard_url = f"https://data.sec.gov/submissions/{name}"
+                candidates.extend(qualifying(_filing_rows(_get(shard_url).json())))
 
         if not candidates:
             return None
 
-        # Return the most recent S-1/A or S-1 before the IPO date
-        candidates.sort(key=lambda x: x["filing_date"], reverse=True)
+        candidates.sort(key=lambda row: row["filing_date"], reverse=True)
         return candidates[0]
 
     except Exception as exc:
