@@ -1,553 +1,463 @@
 """
-Machine learning pipeline for IPO underpricing prediction.
+Out-of-sample prediction of first-day IPO returns.
 
-Implements:
-  - Time-based train/test split (train < 2024-01-01, test ≥ 2024-01-01).
-  - TimeSeriesSplit cross-validation.
-  - Baseline, Ridge, Random Forest, and LightGBM models.
-  - Optuna hyperparameter tuning for LightGBM (50 trials, CV MAE objective).
-  - Evaluation reporting: MAE, RMSE, R², Spearman rank correlation.
-  - SHAP value computation and plotting helpers.
+The project is named for a prediction model and the previous version published
+no predictive metric at all. This module produces them, under a protocol fixed
+before the numbers were looked at.
 
-The tuned LightGBM model is returned as the primary model for interpretation.
+**Protocol.**
+
+* Evaluation is a five-fold expanding-window :class:`TimeSeriesSplit` over the
+  sample sorted by listing date, plus one held-out period (listings from
+  2024-01-01) that no model sees during selection.
+* Every fold is scored against two baselines: predict the training mean and
+  predict the training median. A model that cannot beat the training mean has
+  negative out-of-sample R-squared, and that is the number we report.
+* All preprocessing — median imputation, standardisation, sector one-hot —
+  lives inside a :class:`~sklearn.pipeline.Pipeline` fitted on the training
+  fold only. Nothing is fitted on the full dataset.
+* Hyperparameters come from a small fixed grid chosen by an *inner*
+  three-fold time-series split on the training fold, by MAE. The outer test
+  fold is never used for selection. There is no Optuna search: with an
+  out-of-sample R-squared near zero, a 60-trial search selects noise, and
+  running one until a fold looks good is fitting the test set.
+* Seeds are fixed. Re-running gives the same table.
+
+**Why so few features survive.** ``select_features`` drops anything measured
+at or after the first trade, anything derived from the target, and any column
+constant on the training fold. The surviving count is reported, not assumed.
 """
 
 from __future__ import annotations
 
-import warnings
-from pathlib import Path
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any
 
-import lightgbm as lgb
-import matplotlib.pyplot as plt
 import numpy as np
-import optuna
 import pandas as pd
-import shap
-import statsmodels.api as sm
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import RidgeCV
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from scipy.stats import spearmanr
 
 from src.utils import setup_logging
 
-optuna.logging.set_verbosity(optuna.logging.WARNING)
-warnings.filterwarnings("ignore", category=UserWarning)
-
 log = setup_logging(__name__)
 
-FIGURES_DIR = Path("reports/figures")
-FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+RANDOM_STATE = 20240517
+TARGET = "underpricing"
+DATE_COLUMN = "ipo_date"
+HOLDOUT_START = "2024-01-01"
 
-# ---------------------------------------------------------------------------
-# Feature selection helpers
-# ---------------------------------------------------------------------------
+# Columns that are the target, encode it, or are only observable once trading
+# has begun. Anything matching these cannot enter the feature set.
+POST_LISTING_PREFIXES = ("first_day_", "first_week", "first_month")
+EXCLUDED_EXACT = frozenset(
+    {
+        "underpricing",
+        "winsorized_underpricing",
+        "offer_price",          # enters as log_offer_price
+        "split_factor",
+        "split_adjusted",
+        "trading_day_lag",
+        "has_filing",
+        "cik",
+        "sic",
+        "n_underwriters_matched",
+    }
+)
 
-def select_features(df: pd.DataFrame) -> list[str]:
-    """Return the list of modelling feature columns present in *df*.
+NUMERIC_CANDIDATES = [
+    "log_offer_price",
+    "log_offer_size",
+    "filed_shares_offered",
+    "vix_at_pricing",
+    "nasdaq_30d_return",
+    "nasdaq_30d_volatility",
+    "hot_market_dummy",
+    "is_spac",
+    "max_underwriter_rank",
+    "lead_underwriter_rank",
+    "top_tier_underwriter",
+    "ipo_year",
+    "ipo_quarter",
+    "ipo_month",
+    "ipo_dayofweek",
+    "lm_negative_ratio",
+    "lm_positive_ratio",
+    "lm_uncertainty_ratio",
+    "lm_litigious_ratio",
+    "lm_constraining_ratio",
+    "lm_modal_strong_ratio",
+    "lm_modal_weak_ratio",
+    "rf_lm_negative_ratio",
+    "rf_lm_uncertainty_ratio",
+    "rf_lm_litigious_ratio",
+    "risk_concentration_ratio",
+    "gunning_fog",
+    "prospectus_uniqueness",
+    "log_prospectus_words",
+]
+CATEGORICAL_CANDIDATES = ["sector"]
 
-    Excludes the target, raw text, date, and identifier columns.
+
+@dataclass
+class FeatureSet:
+    """The columns a model is allowed to see, and why others were dropped."""
+
+    numeric: list[str]
+    categorical: list[str]
+    dropped_missing: list[str] = field(default_factory=list)
+    dropped_constant: list[str] = field(default_factory=list)
+
+    @property
+    def all_columns(self) -> list[str]:
+        return [*self.numeric, *self.categorical]
+
+
+def select_features(
+    df: pd.DataFrame,
+    min_coverage: float = 0.30,
+) -> FeatureSet:
+    """Choose modelling columns, excluding anything not knowable before trading.
 
     Args:
-        df: Full IPO features DataFrame.
+        df: Analysis sample.
+        min_coverage: Minimum non-null share for a column to be kept.
 
     Returns:
-        List of numeric feature column names suitable for modelling.
+        A :class:`FeatureSet` recording what was kept and what was dropped.
+
+    Raises:
+        ValueError: If a post-listing column reaches the candidate list, which
+            would mean the exclusion rules have drifted.
     """
-    exclude_prefixes = ("winsorized_", "first_day_", "first_week", "first_month")
-    exclude_exact = {
-        "ticker", "company_name", "ipo_date", "filing_date",
-        "underpricing", "offer_price", "status", "scrape_year",
-        "lead_underwriter_raw", "sector_raw", "industry_raw",
+    numeric, categorical = [], []
+    dropped_missing, dropped_constant = [], []
+
+    for column in NUMERIC_CANDIDATES:
+        if column not in df.columns:
+            continue
+        if column in EXCLUDED_EXACT or column.startswith(POST_LISTING_PREFIXES):
+            raise ValueError(f"{column!r} is a post-listing or target column")
+        series = df[column]
+        if series.notna().mean() < min_coverage:
+            dropped_missing.append(column)
+        elif series.nunique(dropna=True) < 2:
+            dropped_constant.append(column)
+        else:
+            numeric.append(column)
+
+    for column in CATEGORICAL_CANDIDATES:
+        if column in df.columns and df[column].nunique(dropna=True) >= 2:
+            categorical.append(column)
+
+    return FeatureSet(numeric, categorical, dropped_missing, dropped_constant)
+
+
+def build_pipeline(features: FeatureSet, estimator: Any) -> Pipeline:
+    """Wrap *estimator* behind per-fold imputation, scaling and one-hot encoding.
+
+    Fitting the preprocessing inside the pipeline is what keeps the training
+    fold's medians and category set out of the test fold.
+    """
+    numeric_steps = Pipeline(
+        [("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]
+    )
+    categorical_steps = Pipeline(
+        [
+            ("impute", SimpleImputer(strategy="constant", fill_value="Unclassified")),
+            ("encode", OneHotEncoder(handle_unknown="ignore", min_frequency=10,
+                                     sparse_output=False)),
+        ]
+    )
+    transformer = ColumnTransformer(
+        [
+            ("numeric", numeric_steps, features.numeric),
+            ("categorical", categorical_steps, features.categorical),
+        ],
+        remainder="drop",
+    )
+    return Pipeline([("prep", transformer), ("model", estimator)])
+
+
+# ---------------------------------------------------------------------------
+# Model grid
+# ---------------------------------------------------------------------------
+
+def candidate_models() -> dict[str, list[tuple[dict, Any]]]:
+    """Return the fixed hyperparameter grid, declared before any evaluation.
+
+    Returns:
+        Model name to a list of ``(params, estimator)`` pairs. The inner
+        time-series split picks one pair per outer training fold.
+    """
+    import lightgbm as lgb
+
+    grid: dict[str, list[tuple[dict, Any]]] = {
+        "Ridge": [
+            ({"alpha": a}, Ridge(alpha=a, random_state=None))
+            for a in (0.1, 1.0, 10.0, 100.0, 1000.0)
+        ],
+        "RandomForest": [
+            (
+                {"n_estimators": n, "max_depth": d, "min_samples_leaf": 10},
+                RandomForestRegressor(
+                    n_estimators=n, max_depth=d, min_samples_leaf=10,
+                    random_state=RANDOM_STATE, n_jobs=-1,
+                ),
+            )
+            for n in (300,)
+            for d in (3, 5, None)
+        ],
+        "LightGBM": [
+            (
+                {"n_estimators": n, "learning_rate": lr, "num_leaves": leaves,
+                 "min_child_samples": 20},
+                lgb.LGBMRegressor(
+                    n_estimators=n, learning_rate=lr, num_leaves=leaves,
+                    min_child_samples=20, subsample=0.8, subsample_freq=1,
+                    colsample_bytree=0.8, reg_lambda=1.0,
+                    random_state=RANDOM_STATE, n_jobs=-1, verbose=-1,
+                ),
+            )
+            for n in (200, 600)
+            for lr in (0.03, 0.1)
+            for leaves in (15, 31)
+        ],
+    }
+    return grid
+
+
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Return R-squared, RMSE, MAE and Spearman rho for one set of predictions."""
+    rho = float("nan")
+    if len(np.unique(y_pred)) > 1 and len(y_true) > 2:
+        rho = float(spearmanr(y_true, y_pred).statistic)
+    return {
+        "r2": float(r2_score(y_true, y_pred)),
+        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
+        "mae": float(mean_absolute_error(y_true, y_pred)),
+        "spearman": rho,
     }
 
-    numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    features = [
-        c for c in numeric_cols
-        if c not in exclude_exact
-        and not any(c.startswith(p) for p in exclude_prefixes)
-    ]
-    return features
 
-
-# ---------------------------------------------------------------------------
-# Train/test split
-# ---------------------------------------------------------------------------
-
-def time_split(
-    df: pd.DataFrame,
-    date_col: str = "ipo_date",
-    cutoff: str = "2024-01-01",
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split *df* into train (before cutoff) and test (on/after cutoff).
-
-    Args:
-        df: Full dataset.
-        date_col: IPO date column name.
-        cutoff: ISO date string for the split boundary.
-
-    Returns:
-        Tuple ``(train_df, test_df)``.
-    """
-    dates = pd.to_datetime(df[date_col], errors="coerce")
-    cutoff_ts = pd.Timestamp(cutoff)
-    train = df[dates < cutoff_ts].copy()
-    test = df[dates >= cutoff_ts].copy()
-    log.info("Train: %d rows | Test: %d rows (cutoff: %s)", len(train), len(test), cutoff)
-    return train, test
-
-
-# ---------------------------------------------------------------------------
-# Evaluation metrics
-# ---------------------------------------------------------------------------
-
-def evaluate(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    model_name: str = "",
-) -> dict[str, float]:
-    """Compute MAE, RMSE, R², and Spearman rank correlation.
-
-    Args:
-        y_true: Ground-truth values.
-        y_pred: Model predictions.
-        model_name: Label used in logging.
-
-    Returns:
-        Dict with keys ``mae``, ``rmse``, ``r2``, ``spearman_rho``.
-    """
-    mae = mean_absolute_error(y_true, y_pred)
-    rmse = mean_squared_error(y_true, y_pred, squared=False)
-    r2 = r2_score(y_true, y_pred)
-    rho, _ = spearmanr(y_true, y_pred)
-
-    metrics = {"mae": mae, "rmse": rmse, "r2": r2, "spearman_rho": rho}
-    log.info(
-        "[%s] MAE=%.4f | RMSE=%.4f | R²=%.4f | ρ=%.4f",
-        model_name or "model", mae, rmse, r2, rho,
-    )
-    return metrics
-
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
-
-def baseline_median(
-    y_train: np.ndarray, y_test: np.ndarray
-) -> tuple[np.ndarray, dict[str, float]]:
-    """Predict the training-set median for every test observation.
-
-    Args:
-        y_train: Training target values.
-        y_test: Test target values.
-
-    Returns:
-        Tuple of predictions array and evaluation metrics dict.
-    """
-    pred = np.full(len(y_test), np.median(y_train))
-    metrics = evaluate(y_test, pred, "Baseline-Median")
-    return pred, metrics
-
-
-def fit_ols(
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    model_name: str = "OLS",
-) -> tuple[Any, np.ndarray, dict[str, float]]:
-    """Fit OLS regression and return statsmodels result + metrics.
-
-    Args:
-        X_train: Training features.
-        y_train: Training target.
-        X_test: Test features.
-        y_test: Test target.
-        model_name: Label for logging.
-
-    Returns:
-        Tuple of ``(fitted_model, predictions, metrics)``.
-    """
-    X_tr = sm.add_constant(X_train.fillna(0).astype(float))
-    X_te = sm.add_constant(X_test.fillna(0).astype(float))
-    model = sm.OLS(y_train, X_tr).fit()
-    pred = model.predict(X_te)
-    metrics = evaluate(y_test, pred.values, model_name)
-    return model, pred.values, metrics
-
-
-def fit_ridge(
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    n_splits: int = 5,
-) -> tuple[Pipeline, np.ndarray, dict[str, float]]:
-    """Fit Ridge regression with time-series cross-validated alpha.
-
-    Args:
-        X_train: Training features.
-        y_train: Training target.
-        X_test: Test features.
-        y_test: Test target.
-        n_splits: Number of TimeSeriesSplit folds.
-
-    Returns:
-        Tuple of ``(fitted_pipeline, predictions, metrics)``.
-    """
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-    alphas = np.logspace(-3, 4, 50)
-    pipe = Pipeline([
-        ("scaler", StandardScaler()),
-        ("ridge", RidgeCV(alphas=alphas, cv=tscv)),
-    ])
-    X_tr = X_train.fillna(0).astype(float)
-    X_te = X_test.fillna(0).astype(float)
-    pipe.fit(X_tr, y_train)
-    pred = pipe.predict(X_te)
-    best_alpha = pipe.named_steps["ridge"].alpha_
-    log.info("Ridge best α=%.4f", best_alpha)
-    metrics = evaluate(y_test, pred, "Ridge")
-    return pipe, pred, metrics
-
-
-def fit_random_forest(
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    n_splits: int = 5,
-) -> tuple[RandomForestRegressor, np.ndarray, dict[str, float]]:
-    """Fit a Random Forest with simple grid hyperparameters.
-
-    Args:
-        X_train: Training features.
-        y_train: Training target.
-        X_test: Test features.
-        y_test: Test target.
-        n_splits: TimeSeriesSplit folds (used for the best-model selection).
-
-    Returns:
-        Tuple of ``(fitted_model, predictions, metrics)``.
-    """
-    X_tr = X_train.fillna(0).astype(float)
-    X_te = X_test.fillna(0).astype(float)
-
-    best_mae, best_model = float("inf"), None
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-
-    for n_est in (100, 300):
-        for max_d in (5, 10, None):
-            rf = RandomForestRegressor(
-                n_estimators=n_est, max_depth=max_d,
-                min_samples_leaf=5, n_jobs=-1, random_state=42,
-            )
-            cv_maes = []
-            for tr_idx, val_idx in tscv.split(X_tr):
-                rf.fit(X_tr.iloc[tr_idx], y_train[tr_idx])
-                cv_maes.append(mean_absolute_error(y_train[val_idx], rf.predict(X_tr.iloc[val_idx])))
-            cv_mae = np.mean(cv_maes)
-            log.debug("RF n=%d depth=%s → CV MAE=%.4f", n_est, max_d, cv_mae)
-            if cv_mae < best_mae:
-                best_mae, best_model = cv_mae, rf
-
-    best_model.fit(X_tr, y_train)
-    pred = best_model.predict(X_te)
-    metrics = evaluate(y_test, pred, "RandomForest")
-    return best_model, pred, metrics
-
-
-def fit_lgbm_optuna(
-    X_train: pd.DataFrame,
-    y_train: np.ndarray,
-    X_test: pd.DataFrame,
-    y_test: np.ndarray,
-    n_trials: int = 60,
-    n_splits: int = 5,
-) -> tuple[lgb.LGBMRegressor, np.ndarray, dict[str, float]]:
-    """Tune and fit LightGBM with Optuna (objective: CV MAE).
-
-    Args:
-        X_train: Training features.
-        y_train: Training target.
-        X_test: Test features.
-        y_test: Test target.
-        n_trials: Number of Optuna trials.
-        n_splits: TimeSeriesSplit folds for CV.
-
-    Returns:
-        Tuple of ``(fitted_model, predictions, metrics)``.
-    """
-    X_tr = X_train.fillna(0).astype(float)
-    X_te = X_test.fillna(0).astype(float)
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-
-    def objective(trial: optuna.Trial) -> float:
-        params = {
-            "n_estimators": trial.suggest_int("n_estimators", 200, 1000),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-            "max_depth": trial.suggest_int("max_depth", 3, 8),
-            "num_leaves": trial.suggest_int("num_leaves", 15, 127),
-            "min_child_samples": trial.suggest_int("min_child_samples", 10, 50),
-            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-            "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 10.0, log=True),
-            "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 10.0, log=True),
-            "random_state": 42,
-            "n_jobs": -1,
-            "verbose": -1,
-        }
-        cv_maes = []
-        for tr_idx, val_idx in tscv.split(X_tr):
-            model = lgb.LGBMRegressor(**params)
-            model.fit(
-                X_tr.iloc[tr_idx], y_train[tr_idx],
-                eval_set=[(X_tr.iloc[val_idx], y_train[val_idx])],
-                callbacks=[lgb.early_stopping(50, verbose=False),
-                           lgb.log_evaluation(-1)],
-            )
-            cv_maes.append(mean_absolute_error(y_train[val_idx], model.predict(X_tr.iloc[val_idx])))
-        return float(np.mean(cv_maes))
-
-    study = optuna.create_study(direction="minimize")
-    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
-
-    best_params = study.best_params
-    log.info("Best LGBM params: %s (CV MAE=%.4f)", best_params, study.best_value)
-
-    best_model = lgb.LGBMRegressor(**best_params, random_state=42, n_jobs=-1, verbose=-1)
-    best_model.fit(X_tr, y_train)
-    pred = best_model.predict(X_te)
-    metrics = evaluate(y_test, pred, "LightGBM-Optuna")
-    return best_model, pred, metrics
-
-
-# ---------------------------------------------------------------------------
-# Diagnostic plots
-# ---------------------------------------------------------------------------
-
-def plot_predicted_vs_actual(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    model_name: str = "Model",
-    save_path: Optional[Path] = None,
-) -> plt.Figure:
-    """Scatter of predicted vs. actual underpricing.
-
-    Args:
-        y_true: Ground-truth values.
-        y_pred: Model predictions.
-        model_name: Title label.
-        save_path: Output PNG path.
-
-    Returns:
-        Matplotlib Figure.
-    """
-    save_path = save_path or FIGURES_DIR / "pred_vs_actual.png"
-    fig, ax = plt.subplots(figsize=(7, 6))
-    ax.scatter(y_pred, y_true, alpha=0.4, s=18, color="#2563EB")
-    lim = max(abs(y_true).max(), abs(y_pred).max()) * 1.05
-    ax.plot([-lim, lim], [-lim, lim], "r--", lw=1.5, label="Perfect fit")
-    ax.set_xlim(-lim, lim)
-    ax.set_ylim(-lim, lim)
-    ax.set_xlabel("Predicted underpricing")
-    ax.set_ylabel("Actual underpricing")
-    ax.set_title(f"{model_name}: Predicted vs. Actual")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    log.info("Saved → %s", save_path)
-    return fig
-
-
-def plot_residuals(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    dates: Optional[pd.Series] = None,
-    model_name: str = "Model",
-    save_path: Optional[Path] = None,
-) -> plt.Figure:
-    """Residual plots: residual vs. predicted and optionally vs. time.
-
-    Args:
-        y_true: Ground-truth values.
-        y_pred: Model predictions.
-        dates: Optional date Series aligned with y_true for time-drift plot.
-        model_name: Title label.
-        save_path: Output PNG path.
-
-    Returns:
-        Matplotlib Figure.
-    """
-    save_path = save_path or FIGURES_DIR / "residuals.png"
-    residuals = y_true - y_pred
-    n_plots = 2 if dates is not None else 1
-    fig, axes = plt.subplots(1, n_plots, figsize=(6 * n_plots, 5))
-    if n_plots == 1:
-        axes = [axes]
-
-    axes[0].scatter(y_pred, residuals, alpha=0.4, s=18, color="#2563EB")
-    axes[0].axhline(0, color="red", linestyle="--", lw=1.5)
-    axes[0].set_xlabel("Predicted")
-    axes[0].set_ylabel("Residual")
-    axes[0].set_title(f"{model_name}: Residuals vs. Predicted")
-
-    if dates is not None:
-        axes[1].scatter(pd.to_datetime(dates), residuals, alpha=0.4, s=18, color="#6B7280")
-        axes[1].axhline(0, color="red", linestyle="--", lw=1.5)
-        axes[1].set_xlabel("IPO date")
-        axes[1].set_ylabel("Residual")
-        axes[1].set_title(f"{model_name}: Residuals over Time")
-        fig.autofmt_xdate()
-
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    log.info("Saved → %s", save_path)
-    return fig
-
-
-# ---------------------------------------------------------------------------
-# SHAP interpretation
-# ---------------------------------------------------------------------------
-
-def compute_shap(
-    model: Any,
+def _select_on_inner_split(
     X: pd.DataFrame,
-    max_display: int = 15,
-    save_prefix: str = "shap",
-) -> shap.Explanation:
-    """Compute SHAP values and produce summary and dependence plots.
+    y: np.ndarray,
+    features: FeatureSet,
+    grid: list[tuple[dict, Any]],
+    n_inner: int = 3,
+) -> tuple[dict, Any]:
+    """Pick one grid point using an inner time-series split of the training fold."""
+    if len(grid) == 1 or len(X) < (n_inner + 1) * 20:
+        return grid[0]
 
-    Args:
-        model: Fitted tree model (LightGBM / XGBoost / RandomForest).
-        X: Feature matrix for which to compute SHAP values.
-        max_display: Number of features shown in the beeswarm plot.
-        save_prefix: Prefix for saved PNG files.
+    inner = TimeSeriesSplit(n_splits=n_inner)
+    best_score, best = np.inf, grid[0]
+    for params, estimator in grid:
+        scores = []
+        for train_idx, valid_idx in inner.split(X):
+            pipeline = build_pipeline(features, _clone(estimator))
+            pipeline.fit(X.iloc[train_idx], y[train_idx])
+            scores.append(mean_absolute_error(y[valid_idx], pipeline.predict(X.iloc[valid_idx])))
+        score = float(np.mean(scores))
+        if score < best_score:
+            best_score, best = score, (params, estimator)
+    return best
 
-    Returns:
-        SHAP :class:`~shap.Explanation` object.
-    """
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer(X.fillna(0).astype(float))
 
-    # Beeswarm summary
-    fig_beeswarm, ax = plt.subplots(figsize=(10, 7))
-    shap.plots.beeswarm(shap_values, max_display=max_display, show=False)
-    plt.tight_layout()
-    beeswarm_path = FIGURES_DIR / f"{save_prefix}_beeswarm.png"
-    plt.savefig(beeswarm_path, dpi=150, bbox_inches="tight")
-    plt.close()
-    log.info("SHAP beeswarm saved → %s", beeswarm_path)
+def _clone(estimator: Any) -> Any:
+    from sklearn.base import clone
 
-    # Dependence plots for top-3 text features
-    text_feature_names = [
-        c for c in [
-            "lm_negative_ratio", "lm_uncertainty_ratio", "prospectus_uniqueness",
-            "fog_index_mda", "lm_litigious_ratio",
-        ]
-        if c in X.columns
-    ][:3]
-
-    for feat in text_feature_names:
-        if feat not in X.columns:
-            continue
-        fig_dep, ax = plt.subplots(figsize=(8, 5))
-        shap.plots.scatter(shap_values[:, feat], color=shap_values[:, "hot_market_dummy"]
-                           if "hot_market_dummy" in X.columns else None, show=False, ax=ax)
-        ax.set_title(f"SHAP dependence: {feat}")
-        dep_path = FIGURES_DIR / f"{save_prefix}_dep_{feat}.png"
-        fig_dep.savefig(dep_path, dpi=150, bbox_inches="tight")
-        plt.close(fig_dep)
-        log.info("SHAP dependence saved → %s", dep_path)
-
-    return shap_values
+    return clone(estimator)
 
 
 # ---------------------------------------------------------------------------
-# Full pipeline entry point
+# Cross-validated evaluation
 # ---------------------------------------------------------------------------
 
-def run_modelling_pipeline(
+def cross_validate(
     df: pd.DataFrame,
-    target_col: str = "winsorized_underpricing",
-    date_col: str = "ipo_date",
-    n_optuna_trials: int = 60,
-) -> dict[str, Any]:
-    """Execute the full modelling pipeline end-to-end.
+    target_col: str = TARGET,
+    n_splits: int = 5,
+    winsorise: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Score every model and both baselines on an expanding-window split.
 
     Args:
-        df: Full IPO features DataFrame (preprocessed + feature-engineered).
-        target_col: Target variable column name.
-        date_col: IPO date column (for time-based split and residual plots).
-        n_optuna_trials: Optuna trial budget for LightGBM tuning.
+        df: Analysis sample. Sorted by listing date internally.
+        target_col: Target column.
+        n_splits: Outer folds.
+        winsorise: Clip the target at the *training fold's* 1st and 99th
+            percentiles before fitting and scoring. Fitted on the training
+            fold only, so it is not look-ahead. Reported as a separate table
+            because OLS-style losses are not robust to the raw right tail.
 
     Returns:
-        Dict containing trained models, predictions, metrics, and SHAP values.
+        ``(per_fold, summary)``. ``per_fold`` has one row per model and fold;
+        ``summary`` averages across folds and reports the spread, which on IPO
+        data is large enough that an average alone is misleading.
     """
-    feature_cols = select_features(df)
-    df_model = df[feature_cols + [target_col, date_col]].dropna(subset=[target_col])
+    data = df.dropna(subset=[target_col]).sort_values(DATE_COLUMN).reset_index(drop=True)
+    features = select_features(data)
+    X = data[features.all_columns]
+    y = data[target_col].to_numpy(dtype=float)
 
-    train_df, test_df = time_split(df_model, date_col)
-
-    X_train = train_df[feature_cols]
-    y_train = train_df[target_col].values
-    X_test = test_df[feature_cols]
-    y_test = test_df[target_col].values
-
-    results: dict[str, Any] = {}
-
-    # ── Baselines ──────────────────────────────────────────────────────────
-    pred_median, metrics_median = baseline_median(y_train, y_test)
-    results["baseline_median"] = {"predictions": pred_median, "metrics": metrics_median}
-
-    # Financial features only (for H6 comparison)
-    fin_features = [c for c in feature_cols if not any(
-        kw in c for kw in ("lm_", "fog_", "uniqueness", "word_count")
-    )]
-    _, _, metrics_ols_fin = fit_ols(
-        X_train[fin_features], y_train, X_test[fin_features], y_test, "OLS-Financial"
+    log.info(
+        "Cross-validating on n=%d with %d numeric + %d categorical features "
+        "(dropped %d for coverage, %d constant)",
+        len(data), len(features.numeric), len(features.categorical),
+        len(features.dropped_missing), len(features.dropped_constant),
     )
-    results["ols_financial"] = {"metrics": metrics_ols_fin, "features": fin_features}
 
-    _, _, metrics_ols_full = fit_ols(X_train, y_train, X_test, y_test, "OLS-Full")
-    results["ols_full"] = {"metrics": metrics_ols_full}
+    grid = candidate_models()
+    rows: list[dict] = []
+    splitter = TimeSeriesSplit(n_splits=n_splits)
 
-    # ── Ridge ──────────────────────────────────────────────────────────────
-    pipe_ridge, pred_ridge, metrics_ridge = fit_ridge(X_train, y_train, X_test, y_test)
-    results["ridge"] = {"model": pipe_ridge, "predictions": pred_ridge, "metrics": metrics_ridge}
+    for fold, (train_idx, test_idx) in enumerate(splitter.split(X), start=1):
+        y_train, y_test = y[train_idx], y[test_idx]
+        if winsorise:
+            low, high = np.percentile(y_train, [1, 99])
+            y_train = np.clip(y_train, low, high)
+            y_test = np.clip(y_test, low, high)
 
-    # ── Random Forest ──────────────────────────────────────────────────────
-    rf, pred_rf, metrics_rf = fit_random_forest(X_train, y_train, X_test, y_test)
-    results["random_forest"] = {"model": rf, "predictions": pred_rf, "metrics": metrics_rf}
+        common = {
+            "fold": fold,
+            "n_train": len(train_idx),
+            "n_test": len(test_idx),
+            "train_end": str(data[DATE_COLUMN].iloc[train_idx[-1]].date()),
+            "test_end": str(data[DATE_COLUMN].iloc[test_idx[-1]].date()),
+        }
 
-    # ── LightGBM + Optuna ──────────────────────────────────────────────────
-    lgbm, pred_lgbm, metrics_lgbm = fit_lgbm_optuna(
-        X_train, y_train, X_test, y_test, n_trials=n_optuna_trials
+        for name, value in [("Baseline: train mean", float(np.mean(y_train))),
+                            ("Baseline: train median", float(np.median(y_train)))]:
+            rows.append({**common, "model": name,
+                         **evaluate(y_test, np.full(len(y_test), value))})
+
+        for name, model_grid in grid.items():
+            params, estimator = _select_on_inner_split(
+                X.iloc[train_idx], y_train, features, model_grid
+            )
+            pipeline = build_pipeline(features, _clone(estimator))
+            pipeline.fit(X.iloc[train_idx], y_train)
+            rows.append({
+                **common,
+                "model": name,
+                **evaluate(y_test, pipeline.predict(X.iloc[test_idx])),
+                "params": str(params),
+            })
+
+    per_fold = pd.DataFrame(rows)
+    summary = (
+        per_fold.groupby("model")[["r2", "rmse", "mae", "spearman"]]
+        .agg(["mean", "std", "min", "max"])
+        .round(4)
     )
-    results["lightgbm"] = {"model": lgbm, "predictions": pred_lgbm, "metrics": metrics_lgbm}
+    summary.columns = ["_".join(c) for c in summary.columns]
+    summary = summary.reset_index().sort_values("r2_mean", ascending=False)
+    return per_fold, summary
 
-    # ── Diagnostic plots ───────────────────────────────────────────────────
-    plot_predicted_vs_actual(y_test, pred_lgbm, "LightGBM",
-                             FIGURES_DIR / "lgbm_pred_vs_actual.png")
-    plot_residuals(y_test, pred_lgbm, test_df[date_col], "LightGBM",
-                   FIGURES_DIR / "lgbm_residuals.png")
 
-    # ── SHAP ───────────────────────────────────────────────────────────────
-    shap_values = compute_shap(lgbm, X_test, save_prefix="lgbm")
-    results["shap_values"] = shap_values
+def holdout_evaluation(
+    df: pd.DataFrame,
+    target_col: str = TARGET,
+    holdout_start: str = HOLDOUT_START,
+) -> tuple[pd.DataFrame, dict[str, np.ndarray], pd.DataFrame]:
+    """Train on everything before *holdout_start* and score the period after it.
 
-    # ── Metrics summary table ──────────────────────────────────────────────
-    metrics_table = pd.DataFrame([
-        {"Model": name, **res["metrics"]}
-        for name, res in results.items()
-        if "metrics" in res
-    ])
-    results["metrics_table"] = metrics_table
-    log.info("\n%s", metrics_table.to_string(index=False))
+    Args:
+        df: Analysis sample.
+        target_col: Target column.
+        holdout_start: ISO date opening the held-out period.
 
-    return results
+    Returns:
+        ``(metrics, predictions, test_frame)``. ``predictions`` maps model name
+        to its held-out predictions, aligned with ``test_frame``.
+    """
+    data = df.dropna(subset=[target_col]).sort_values(DATE_COLUMN).reset_index(drop=True)
+    features = select_features(data)
+    cutoff = pd.Timestamp(holdout_start)
+    train = data[data[DATE_COLUMN] < cutoff]
+    test = data[data[DATE_COLUMN] >= cutoff]
+
+    X_train, y_train = train[features.all_columns], train[target_col].to_numpy(dtype=float)
+    X_test, y_test = test[features.all_columns], test[target_col].to_numpy(dtype=float)
+
+    rows: list[dict] = []
+    predictions: dict[str, np.ndarray] = {}
+    common = {"n_train": len(train), "n_test": len(test),
+              "holdout_start": holdout_start}
+
+    for name, value in [("Baseline: train mean", float(np.mean(y_train))),
+                        ("Baseline: train median", float(np.median(y_train)))]:
+        pred = np.full(len(y_test), value)
+        predictions[name] = pred
+        rows.append({**common, "model": name, **evaluate(y_test, pred)})
+
+    for name, model_grid in candidate_models().items():
+        params, estimator = _select_on_inner_split(X_train, y_train, features, model_grid)
+        pipeline = build_pipeline(features, _clone(estimator))
+        pipeline.fit(X_train, y_train)
+        pred = pipeline.predict(X_test)
+        predictions[name] = pred
+        rows.append({**common, "model": name, **evaluate(y_test, pred), "params": str(params)})
+
+    return pd.DataFrame(rows).sort_values("r2", ascending=False), predictions, test
+
+
+def fit_final_lightgbm(df: pd.DataFrame, target_col: str = TARGET) -> tuple[Pipeline, pd.DataFrame, FeatureSet]:
+    """Fit LightGBM on the whole sample, for SHAP inspection only.
+
+    The returned model is not evaluated: it has seen every row. It exists so
+    that :func:`shap_summary` can report what the model keys on, which is a
+    statement about the model and not about the world.
+    """
+    import lightgbm as lgb
+
+    data = df.dropna(subset=[target_col]).sort_values(DATE_COLUMN).reset_index(drop=True)
+    features = select_features(data)
+    estimator = lgb.LGBMRegressor(
+        n_estimators=400, learning_rate=0.05, num_leaves=31, min_child_samples=20,
+        subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=1.0,
+        random_state=RANDOM_STATE, n_jobs=-1, verbose=-1,
+    )
+    pipeline = build_pipeline(features, estimator)
+    pipeline.fit(data[features.all_columns], data[target_col].to_numpy(dtype=float))
+    return pipeline, data, features
+
+
+def shap_summary(pipeline: Pipeline, data: pd.DataFrame, features: FeatureSet) -> tuple[Any, pd.DataFrame, np.ndarray]:
+    """Compute SHAP values for the fitted LightGBM pipeline.
+
+    SHAP explains the model, not the data-generating process. When the model's
+    out-of-sample R-squared is approximately zero, a large mean absolute SHAP
+    value identifies what the model leaned on while failing to generalise. It
+    is not evidence that the feature drives underpricing.
+
+    Returns:
+        ``(shap_values, importance, transformed)`` where ``importance`` ranks
+        features by mean absolute SHAP value.
+    """
+    import shap
+
+    prep = pipeline.named_steps["prep"]
+    model = pipeline.named_steps["model"]
+    transformed = prep.transform(data[features.all_columns])
+    names = list(prep.get_feature_names_out())
+    frame = pd.DataFrame(transformed, columns=names)
+
+    explainer = shap.TreeExplainer(model)
+    values = explainer.shap_values(frame)
+
+    importance = (
+        pd.DataFrame({"feature": names, "mean_abs_shap": np.abs(values).mean(axis=0)})
+        .sort_values("mean_abs_shap", ascending=False)
+        .reset_index(drop=True)
+    )
+    return values, importance, frame
