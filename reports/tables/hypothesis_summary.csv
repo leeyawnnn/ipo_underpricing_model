@@ -1,0 +1,7 @@
+test,hypothesis,method,n,statistic,ci_low,ci_high,p_raw,p_robust,reject_at_005_raw,p_bonferroni,p_bh,significant_bonferroni,significant_bh
+H1,H1: litigious tone and first-day return,"Spearman rho with a percentile bootstrap CI, plus Kruskal-Wallis across quintiles",474,-0.04691320387929091,-0.1362992523600017,0.04000386098278952,0.308090354514641,,False,1.0,0.5967640424856681,False,False
+H2,H2: underwriter translation,"OLS interaction with HC3 errors, plus a bootstrap difference of Spearman rho",362,-29.232394957550227,,,0.6338307286353204,,False,1.0,0.7605968743623845,False,False
+H3,H3: disclosure concentration,"Spearman rho with a percentile bootstrap CI, plus Kruskal-Wallis across terciles",402,-0.012336705340263576,-0.10609427738985498,0.08617464132518445,0.8052260621919072,,False,1.0,0.8052260621919073,False,False
+H4,H4: VIX and return variance,"Levene's test, median-centred",709,2.387374467183973,,,0.09261189813720348,4.706793026749669e-09,False,0.5556713888232209,0.27783569441161043,False,False
+H5,H5: underwriter tier and return variance,"Levene's test, median-centred, with Fligner-Killeen as a rank-based check",405,9.162086030955068,,,0.002629424396034664,0.21580109378967335,True,0.015776546376207984,0.015776546376207984,True,True
+H6,H6: incremental value of text features,"Likelihood-ratio test, chi-square(7)",320,7.3048623692917545,,,0.3978426949904454,,False,1.0,0.5967640424856681,False,False

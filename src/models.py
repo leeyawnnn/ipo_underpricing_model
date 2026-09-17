@@ -166,8 +166,16 @@ def build_pipeline(features: FeatureSet, estimator: Any) -> Pipeline:
     Fitting the preprocessing inside the pipeline is what keeps the training
     fold's medians and category set out of the test fold.
     """
+    # keep_empty_features keeps the matrix width stable when an early inner
+    # fold happens to contain no observed value for a column (hot_market_dummy
+    # is undefined for the first 100 deals, before its expanding threshold has
+    # any history). Without it the column is dropped and the feature space
+    # changes between folds.
     numeric_steps = Pipeline(
-        [("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]
+        [
+            ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
+            ("scale", StandardScaler()),
+        ]
     )
     categorical_steps = Pipeline(
         [

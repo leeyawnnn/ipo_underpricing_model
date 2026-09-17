@@ -1,0 +1,8 @@
+step,n,dropped,pct_of_universe
+IPOs in the 2019-2024 calendar,1773,0,100.0
+with an offer price,1729,44,97.5
+with a recoverable first-day close,709,1020,40.0
+with a computable first-day return (the target),709,0,40.0
+and a SEC-assigned SIC code,685,24,38.6
+and a recovered S-1/F-1 prospectus,474,211,26.7
+and a Risk Factors section extracted,474,0,26.7

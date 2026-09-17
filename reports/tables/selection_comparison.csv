@@ -1,0 +1,6 @@
+observable,in_sample,out_of_sample,difference,p_value,n_in,n_out
+Listing year,2021.292,2021.0431,0.2489,0.002858,589,1184
+Offer price (USD),15.2175,11.7095,3.508,0.0,570,1159
+First-day return,0.2991,0.6118,-0.3127,0.204435,474,235
+VIX at pricing,19.4552,20.7947,-1.3395,1.8e-05,589,1184
+SPAC share,0.0781,0.078,0.0001,0.996544,589,282
