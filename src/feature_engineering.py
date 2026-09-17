@@ -1,351 +1,296 @@
 """
-Feature engineering for IPO underpricing prediction.
+Feature engineering for the IPO underpricing study.
 
-Builds three feature groups:
+Every feature here must be knowable before the stock's first trade. Three
+places where the previous implementation was not, and what changed:
 
-  - **Calendar features** — year, quarter, month, day-of-week, quarter-end
-    month indicator, and days from S-1 filing to pricing.
-  - **Market-regime features** — VIX at pricing, NASDAQ rolling return/
-    volatility, hot-market dummy.
-  - **Deal features** — log offer size, price revision, underwriter rank,
-    top-tier dummy.
+* **Market regime.** VIX and NASDAQ statistics were read with
+  ``index <= ipo_date``, which on a listing day is that day's close. Now
+  sourced from :func:`src.dataset.market_as_of_prior_day`, strictly lagged.
+* **Prospectus uniqueness.** Hanley-Hoberg similarity was measured against a
+  sector mean computed over the whole sample, so each document was compared
+  against prospectuses that did not exist yet.
+  :func:`expanding_prospectus_uniqueness` compares each filing only against
+  earlier filings in its own sector.
+* **Sector and underwriter encodings.** ``sector_encoded`` and
+  ``lead_underwriter_encoded`` were the mean of the target within each
+  category over the full dataset, then fed to the model and used as a control
+  in the H1 regression. That is the target in disguise. They are gone; sector
+  enters as fixed effects fitted inside each fold.
 
-All functions accept and return pandas DataFrames and are designed to be
-called sequentially in the notebook pipeline.
+Deal size comes from the prospectus cover rather than the calendar, which has
+no size field at all. It is the *filed* base offering, before any
+over-allotment and before final pricing, and is named accordingly.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.utils import setup_logging
 from src import text_features
+from src.underwriters import cover_page_text, syndicate_summary
+from src.utils import setup_logging
 
 log = setup_logging(__name__)
 
+# Sections shorter than this are treated as missing rather than scored.
+MIN_SECTION_WORDS = 100
+
+# The offering size is the share count printed immediately after the
+# prospectus banner, before the issuer name. Anchoring there avoids picking up
+# the over-allotment line or an unrelated share count from the fee table.
+_SIZE_ANCHOR_RE = re.compile(r"(prospectus|subject\s+to\s+completion)", re.IGNORECASE)
+_SIZE_COUNT_RE = re.compile(
+    r"\b([\d][\d,]{5,})\s+(?:shares|american\s+depositary\s+shares|adss|units)\b",
+    re.IGNORECASE,
+)
+_SIZE_SEARCH_SPAN = 200
+_COVER_SEARCH_CHARS = 8_000
+
+
 # ---------------------------------------------------------------------------
-# Calendar features
+# Deal size from the prospectus cover
 # ---------------------------------------------------------------------------
 
-def add_calendar_features(df: pd.DataFrame, date_col: str = "ipo_date") -> pd.DataFrame:
-    """Add calendar-derived features to *df*.
+def filed_shares_offered(full_text: str) -> float:
+    """Extract the filed base offering size, in shares, from a cover page.
 
     Args:
-        df: IPO DataFrame with a datetime column named *date_col*.
-        date_col: Name of the column holding the IPO date.
+        full_text: Plain text of the S-1 / F-1 filing.
 
     Returns:
-        Copy of *df* with additional columns:
-        ``ipo_year``, ``ipo_quarter``, ``ipo_month``, ``ipo_dayofweek``,
-        ``is_quarter_end_month``, ``days_from_filing_to_pricing``.
+        Share count, or ``nan`` when the cover does not state one in the
+        expected position.
+
+    Example:
+        >>> filed_shares_offered("PRELIMINARY PROSPECTUS 8,250,000 Shares Common Stock")
+        8250000.0
     """
-    df = df.copy()
-    dates = pd.to_datetime(df[date_col], errors="coerce")
-
-    df["ipo_year"] = dates.dt.year
-    df["ipo_quarter"] = dates.dt.quarter
-    df["ipo_month"] = dates.dt.month
-    df["ipo_dayofweek"] = dates.dt.dayofweek  # Monday=0, Friday=4
-
-    # March, June, September, December = quarter-end months
-    df["is_quarter_end_month"] = dates.dt.month.isin([3, 6, 9, 12]).astype(int)
-
-    # Days from S-1 filing date to IPO pricing date
-    if "filing_date" in df.columns:
-        filing_dates = pd.to_datetime(df["filing_date"], errors="coerce")
-        df["days_from_filing_to_pricing"] = (dates - filing_dates).dt.days
-    else:
-        df["days_from_filing_to_pricing"] = np.nan
-
-    return df
+    cover = cover_page_text(full_text)[:_COVER_SEARCH_CHARS]
+    for anchor in _SIZE_ANCHOR_RE.finditer(cover):
+        match = _SIZE_COUNT_RE.search(cover, anchor.end(), anchor.end() + _SIZE_SEARCH_SPAN)
+        if match:
+            return float(match.group(1).replace(",", ""))
+    return float("nan")
 
 
 # ---------------------------------------------------------------------------
-# Market-regime features
+# Prospectus uniqueness, expanding window
 # ---------------------------------------------------------------------------
 
-def add_market_features(
-    df: pd.DataFrame,
-    market_csv: Path = Path("data/raw/market_indices.csv"),
-    date_col: str = "ipo_date",
-    lookback_days: int = 30,
-    hot_market_window: int = 90,
-    hot_market_tercile_threshold: float = 2 / 3,
-) -> pd.DataFrame:
-    """Add market-regime features derived from VIX and NASDAQ data.
+def expanding_prospectus_uniqueness(
+    texts: list[str],
+    sectors: list[str],
+    dates: list[pd.Timestamp],
+    min_prior: int = 5,
+    max_features: int = 5_000,
+) -> np.ndarray:
+    """Hanley-Hoberg prospectus uniqueness against *earlier* same-sector filings.
+
+    ``uniqueness = 1 - cosine(doc, mean of prior same-sector docs)``. A score
+    near zero means boilerplate, near one means distinctive.
+
+    The vocabulary is fit once on the whole corpus. That is a mild look-ahead
+    in the vectoriser only, not in the comparison set, and it is what keeps the
+    measure comparable across filings; the alternative — refitting TF-IDF at
+    every observation — changes the feature space between rows and makes the
+    scores incommensurable. The comparison set itself is strictly historical.
 
     Args:
-        df: IPO DataFrame.
-        market_csv: Path to the market indices CSV (from
-            :func:`src.scraper_prices.download_market_indices`).
-        date_col: Name of the IPO date column.
-        lookback_days: Number of trading days for rolling NASDAQ statistics.
-        hot_market_window: Calendar-day window for counting IPOs (hot market).
-        hot_market_tercile_threshold: Fraction of the distribution that defines
-            the boundary between cold and hot markets (default: top tercile).
+        texts: Prospectus bodies.
+        sectors: Sector label per text.
+        dates: Filing or listing date per text.
+        min_prior: Prior same-sector filings required before a score is
+            produced; below this the score is ``nan``.
+        max_features: TF-IDF vocabulary size.
 
     Returns:
-        Copy of *df* with additional columns:
-        ``vix_at_pricing``, ``nasdaq_30d_return``, ``nasdaq_30d_volatility``,
-        ``hot_market_dummy``.
+        Array of uniqueness scores aligned to *texts*.
     """
-    df = df.copy()
-    dates = pd.to_datetime(df[date_col], errors="coerce")
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.preprocessing import normalize
 
-    if not market_csv.exists():
-        log.warning("Market index CSV not found at %s; skipping market features.", market_csv)
-        for col in ("vix_at_pricing", "nasdaq_30d_return", "nasdaq_30d_volatility", "hot_market_dummy"):
-            df[col] = np.nan
-        return df
+    if not (len(texts) == len(sectors) == len(dates)):
+        raise ValueError("texts, sectors and dates must be the same length")
 
-    mkt = pd.read_csv(market_csv, parse_dates=["date"], index_col="date")
-    mkt = mkt.sort_index()
+    n = len(texts)
+    out = np.full(n, np.nan)
+    non_empty = [i for i, t in enumerate(texts) if t and t.strip()]
+    if len(non_empty) < min_prior + 1:
+        return out
 
-    # Compute rolling NASDAQ log-returns and vol
-    nasdaq_ret = np.log(mkt["nasdaq_close"] / mkt["nasdaq_close"].shift(1))
-    nasdaq_roll_ret = nasdaq_ret.rolling(lookback_days).sum()
-    nasdaq_roll_vol = nasdaq_ret.rolling(lookback_days).std() * np.sqrt(252)
+    vectoriser = TfidfVectorizer(
+        max_features=max_features,
+        ngram_range=(1, 2),
+        stop_words="english",
+        sublinear_tf=True,
+        min_df=2,
+    )
+    matrix = vectoriser.fit_transform([texts[i] for i in non_empty])
+    matrix = normalize(matrix)
 
-    vix_list, nasdaq_ret_list, nasdaq_vol_list = [], [], []
+    order = sorted(range(len(non_empty)), key=lambda k: (dates[non_empty[k]], non_empty[k]))
+    running: dict[str, list[int]] = {}
 
-    for ipo_date in dates:
-        if pd.isna(ipo_date):
-            vix_list.append(np.nan)
-            nasdaq_ret_list.append(np.nan)
-            nasdaq_vol_list.append(np.nan)
-            continue
+    for position in order:
+        original = non_empty[position]
+        sector = sectors[original]
+        prior = running.get(sector, [])
+        if len(prior) >= min_prior:
+            centroid = np.asarray(matrix[prior].mean(axis=0)).ravel()
+            norm = np.linalg.norm(centroid)
+            if norm > 0:
+                doc = np.asarray(matrix[position].todense()).ravel()
+                out[original] = float(1.0 - float(doc @ centroid) / norm)
+        running.setdefault(sector, []).append(position)
 
-        # VIX on the IPO pricing date (or nearest prior trading day)
-        vix_subset = mkt["vix_close"][mkt.index <= ipo_date]
-        vix_list.append(float(vix_subset.iloc[-1]) if not vix_subset.empty else np.nan)
-
-        ret_subset = nasdaq_roll_ret[nasdaq_roll_ret.index <= ipo_date]
-        nasdaq_ret_list.append(float(ret_subset.iloc[-1]) if not ret_subset.empty else np.nan)
-
-        vol_subset = nasdaq_roll_vol[nasdaq_roll_vol.index <= ipo_date]
-        nasdaq_vol_list.append(float(vol_subset.iloc[-1]) if not vol_subset.empty else np.nan)
-
-    df["vix_at_pricing"] = vix_list
-    df["nasdaq_30d_return"] = nasdaq_ret_list
-    df["nasdaq_30d_volatility"] = nasdaq_vol_list
-
-    # Hot-market dummy: rolling 90-day IPO count in top tercile
-    df_sorted = df.sort_values(date_col)
-    rolling_counts = []
-    for ipo_date in pd.to_datetime(df_sorted[date_col]):
-        if pd.isna(ipo_date):
-            rolling_counts.append(np.nan)
-            continue
-        window_start = ipo_date - pd.Timedelta(days=hot_market_window)
-        count = ((pd.to_datetime(df_sorted[date_col]) >= window_start) &
-                 (pd.to_datetime(df_sorted[date_col]) <= ipo_date)).sum()
-        rolling_counts.append(count)
-
-    df_sorted["_ipo_rolling_count"] = rolling_counts
-    threshold = df_sorted["_ipo_rolling_count"].quantile(hot_market_tercile_threshold)
-    df_sorted["hot_market_dummy"] = (
-        df_sorted["_ipo_rolling_count"] >= threshold
-    ).astype(int)
-    df_sorted = df_sorted.drop(columns=["_ipo_rolling_count"])
-
-    # Merge back (preserve original order)
-    hot_col = df_sorted[["hot_market_dummy"]]
-    df = df.drop(columns=["hot_market_dummy"], errors="ignore")
-    df = df.join(hot_col)
-
-    return df
+    return out
 
 
 # ---------------------------------------------------------------------------
-# Deal features
+# Text features
 # ---------------------------------------------------------------------------
 
-def add_deal_features(
-    df: pd.DataFrame,
-    underwriter_ranks_csv: Path = Path("data/external/underwriter_ranks.csv"),
-) -> pd.DataFrame:
-    """Add deal-specific features to *df*.
+def _read(path: object) -> str:
+    """Read a text file named by a possibly-missing path column value."""
+    if not isinstance(path, str) or not path:
+        return ""
+    p = Path(path)
+    if not p.exists():
+        return ""
+    return p.read_text(encoding="utf-8", errors="replace")
 
-    Args:
-        df: IPO DataFrame with columns ``offer_price``, ``shares_offered``,
-            ``offer_size_m``, and ``lead_underwriter``.
-        underwriter_ranks_csv: Path to the underwriter-rank CSV containing
-            ``underwriter`` and ``rank`` columns.
-
-    Returns:
-        Copy of *df* with additional columns:
-        ``log_offer_size``, ``log_shares_offered``,
-        ``underwriter_rank``, ``top_tier_underwriter``.
-    """
-    df = df.copy()
-
-    # Log-transforms (offer_size_m in millions, shares_offered in units)
-    if "offer_size_m" in df.columns:
-        df["log_offer_size"] = np.log1p(pd.to_numeric(df["offer_size_m"], errors="coerce"))
-    if "shares_offered" in df.columns:
-        df["log_shares_offered"] = np.log1p(pd.to_numeric(df["shares_offered"], errors="coerce"))
-
-    # Underwriter rank merge
-    if underwriter_ranks_csv.exists():
-        ranks = pd.read_csv(underwriter_ranks_csv)
-        # Normalise underwriter name for fuzzy matching
-        if "underwriter" in ranks.columns and "lead_underwriter" in df.columns:
-            ranks["_uw_key"] = ranks["underwriter"].str.lower().str.strip()
-            df["_uw_key"] = df["lead_underwriter"].str.lower().str.strip()
-            df = df.merge(
-                ranks[["_uw_key", "rank"]].rename(columns={"rank": "underwriter_rank"}),
-                on="_uw_key",
-                how="left",
-            ).drop(columns=["_uw_key"])
-    else:
-        log.warning("Underwriter ranks file not found; underwriter_rank will be NaN.")
-        df["underwriter_rank"] = np.nan
-
-    if "underwriter_rank" not in df.columns:
-        df["underwriter_rank"] = np.nan
-
-    # Top-tier dummy: Carter-Manaster rank ≥ 8
-    df["top_tier_underwriter"] = (
-        pd.to_numeric(df["underwriter_rank"], errors="coerce") >= 8
-    ).astype(float)  # float to carry NaN through
-
-    # SPAC flag
-    if "company_name" in df.columns:
-        spac_re = r"acqui(?:sition|re)|blank\s+check|spac\b"
-        df["is_spac"] = df["company_name"].str.lower().str.contains(
-            spac_re, regex=True, na=False
-        ).astype(int)
-    else:
-        df["is_spac"] = 0
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-# Textual features
-# ---------------------------------------------------------------------------
 
 def add_text_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract textual features using src.text_features.
-
-    Computes LM sentiment ratios on BOTH the full prospectus and the Risk
-    Factors section. Full-prospectus ratios are stored as ``lm_*_ratio``
-    (the primary signal — more reliable because the EDGAR scraper captured
-    longer, less-truncated full-text bodies). Risk Factors ratios are
-    stored as ``rf_lm_*_ratio`` for academic comparability.
+    """Attach LM sentiment ratios, readability, deal size and syndicate fields.
 
     Args:
-        df: IPO DataFrame with path columns.
+        df: Output of :func:`src.dataset.assemble`, with path columns.
 
     Returns:
-        DataFrame with textual features:
-        - ``lm_*_ratio`` — sentiment from full prospectus
-        - ``rf_lm_*_ratio`` — sentiment from Risk Factors section
-        - ``word_count`` / ``rf_word_count`` — total tokens analysed
-        - ``gunning_fog`` — Gunning-Fog readability of MD&A
-        - ``prospectus_uniqueness`` — Hanley-Hoberg TF-IDF score
+        Copy of *df* with:
+        ``lm_*_ratio`` and ``word_count`` from the full prospectus,
+        ``rf_lm_*_ratio`` and ``rf_word_count`` from Risk Factors,
+        ``gunning_fog`` from the MD&A, ``prospectus_uniqueness``,
+        ``filed_shares_offered`` / ``filed_offer_size_usd``, and the
+        underwriter fields from :func:`src.underwriters.syndicate_summary`.
+    """
+    df = df.copy()
+    lm_dict = text_features.load_lm_dictionary()
+
+    records: list[dict] = []
+    texts: list[str] = []
+
+    for _, row in df.iterrows():
+        record: dict = {}
+        full_text = _read(row.get("full_text_path"))
+        texts.append(full_text)
+
+        if full_text:
+            ratios = text_features.compute_lm_ratios(full_text, lm_dict)
+            if ratios.get("word_count", 0) >= MIN_SECTION_WORDS:
+                record.update(ratios)
+            record["filed_shares_offered"] = filed_shares_offered(full_text)
+            record.update(
+                syndicate_summary(
+                    full_text,
+                    int(row["ipo_year"]),
+                    issuer_name=row.get("company_name"),
+                )
+            )
+
+        risk_text = _read(row.get("risk_factors_path"))
+        if risk_text:
+            ratios = text_features.compute_lm_ratios(risk_text, lm_dict)
+            if ratios.get("word_count", 0) >= MIN_SECTION_WORDS:
+                record.update({f"rf_{k}": v for k, v in ratios.items()})
+
+        mda_text = _read(row.get("mda_path"))
+        if mda_text:
+            tokens = text_features.tokenise(mda_text)
+            if len(tokens) >= MIN_SECTION_WORDS:
+                record["gunning_fog"] = text_features.gunning_fog_index(mda_text)
+                record["mda_word_count"] = float(len(tokens))
+
+        records.append(record)
+
+    features = pd.DataFrame(records, index=df.index)
+    for column in features.columns:
+        df[column] = features[column]
+
+    df["prospectus_uniqueness"] = expanding_prospectus_uniqueness(
+        texts,
+        df["sector"].fillna("Unclassified").tolist(),
+        pd.to_datetime(df["ipo_date"]).tolist(),
+    )
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Derived features
+# ---------------------------------------------------------------------------
+
+def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add transforms and ratios built from columns already present.
+
+    Args:
+        df: DataFrame carrying offer price, filed size, LM ratios and
+            underwriter ranks.
+
+    Returns:
+        Copy of *df* with ``log_offer_price``, ``log_offer_size``,
+        ``log_prospectus_words``, ``risk_concentration_ratio`` and
+        ``top_tier_underwriter``.
     """
     df = df.copy()
 
-    lm_dict = text_features.load_lm_dictionary()
+    df["log_offer_price"] = np.log(pd.to_numeric(df["offer_price"], errors="coerce").clip(lower=0.01))
 
-    # Minimum word count to compute reliable sentiment ratios. Below this
-    # threshold the section is treated as missing.
-    MIN_WORDS = 100
+    if "filed_shares_offered" in df.columns:
+        df["filed_offer_size_usd"] = (
+            pd.to_numeric(df["filed_shares_offered"], errors="coerce")
+            * pd.to_numeric(df["offer_price"], errors="coerce")
+        )
+        df["log_offer_size"] = np.log1p(df["filed_offer_size_usd"])
 
-    sentiment_records = []
-    for _, row in df.iterrows():
-        rec: dict = {}
+    if "word_count" in df.columns:
+        df["log_prospectus_words"] = np.log1p(pd.to_numeric(df["word_count"], errors="coerce"))
 
-        full_path = row.get("full_text_path")
-        risk_path = row.get("risk_factors_path")
-        mda_path = row.get("mda_path")
+    # Where the negative tone sits: the share of the prospectus's LM-negative
+    # intensity that lives in Risk Factors. Higher means compartmentalised.
+    if {"rf_lm_negative_ratio", "lm_negative_ratio"}.issubset(df.columns):
+        denominator = pd.to_numeric(df["lm_negative_ratio"], errors="coerce")
+        numerator = pd.to_numeric(df["rf_lm_negative_ratio"], errors="coerce")
+        df["risk_concentration_ratio"] = np.where(
+            denominator > 0, numerator / denominator, np.nan
+        )
 
-        # Primary: full prospectus
-        if full_path and Path(full_path).exists():
-            full_text = Path(full_path).read_text(encoding="utf-8", errors="replace")
-            if len(full_text) > 500:  # rough byte gate
-                s = text_features.compute_lm_ratios(full_text, lm_dict)
-                if s.get("word_count", 0) >= MIN_WORDS:
-                    rec.update(s)
-
-        # Secondary: risk factors (with rf_ prefix)
-        if risk_path and Path(risk_path).exists():
-            risk_text = Path(risk_path).read_text(encoding="utf-8", errors="replace")
-            if len(risk_text) > 500:
-                s = text_features.compute_lm_ratios(risk_text, lm_dict)
-                if s.get("word_count", 0) >= MIN_WORDS:
-                    for k, v in s.items():
-                        rec[f"rf_{k}"] = v
-
-        # Readability on MD&A
-        if mda_path and Path(mda_path).exists():
-            mda_text = Path(mda_path).read_text(encoding="utf-8", errors="replace")
-            if len(mda_text) > 500:
-                rec["gunning_fog"] = text_features.gunning_fog_index(mda_text)
-
-        sentiment_records.append(rec)
-
-    df_sent = pd.DataFrame(sentiment_records)
-    for col in df_sent.columns:
-        df[col] = df_sent[col].values
-
-    # Prospectus Uniqueness (Hanley-Hoberg, sector-level)
-    full_texts: list[str] = []
-    sectors: list[str] = []
-    for _, row in df.iterrows():
-        p = row.get("full_text_path")
-        s = row.get("sector", "Industrials")
-        if p and Path(p).exists():
-            full_texts.append(Path(p).read_text(encoding="utf-8", errors="replace"))
-            sectors.append(str(s) if pd.notna(s) and str(s) != "" else "Industrials")
-        else:
-            full_texts.append("")
-            sectors.append("Industrials")
-
-    if any(len(t) > 0 for t in full_texts):
-        uniqueness = text_features.compute_prospectus_uniqueness(full_texts, sectors)
-        df["prospectus_uniqueness"] = uniqueness
-    else:
-        df["prospectus_uniqueness"] = np.nan
+    # Carter-Manaster 8 is the conventional prestige cut-off (Loughran & Ritter
+    # 2004). Applied to the highest-ranked bank in the syndicate.
+    if "max_underwriter_rank" in df.columns:
+        rank = pd.to_numeric(df["max_underwriter_rank"], errors="coerce")
+        df["top_tier_underwriter"] = np.where(rank.notna(), (rank >= 8).astype(float), np.nan)
 
     return df
 
 
-
-# ---------------------------------------------------------------------------
-# Combined pipeline entry point
-# ---------------------------------------------------------------------------
-
-def build_all_features(
-    df: pd.DataFrame,
-    market_csv: Path = Path("data/raw/market_indices.csv"),
-    underwriter_ranks_csv: Path = Path("data/external/underwriter_ranks.csv"),
-) -> pd.DataFrame:
-    """Apply all feature-engineering steps in sequence.
+def build_all_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Run the full feature-engineering sequence.
 
     Args:
-        df: Cleaned IPO DataFrame (output of preprocessing).
-        market_csv: Market indices CSV path.
-        underwriter_ranks_csv: Underwriter rank CSV path.
+        df: Output of :func:`src.dataset.assemble`.
 
     Returns:
-        DataFrame with all engineered features appended.
+        DataFrame with every engineered feature appended.
     """
-    log.info("Building calendar features …")
-    df = add_calendar_features(df)
-
-    log.info("Building market-regime features …")
-    df = add_market_features(df, market_csv=market_csv)
-
-    log.info("Building deal features …")
-    df = add_deal_features(df, underwriter_ranks_csv=underwriter_ranks_csv)
-
-    log.info("Building text features (NLP) …")
+    log.info("Extracting text, syndicate and deal-size features from %d filings …",
+             int(df["has_filing"].sum()))
     df = add_text_features(df)
-
-    log.info("Feature engineering complete. Shape: %s", df.shape)
+    log.info("Adding derived features …")
+    df = add_derived_features(df)
+    log.info("Feature engineering complete: %s", df.shape)
     return df
