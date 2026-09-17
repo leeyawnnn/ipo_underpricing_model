@@ -4,9 +4,50 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fba-ipo-underpricing-model"
-version = "0.1.0"
-description = "IPO underpricing prediction model"
-requires-python = ">=3.9"
+version = "0.2.0"
+description = "Empirical study of US IPO first-day returns, 2019-2024"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
 
 [tool.setuptools.packages.find]
 include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["notebooks", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B905",    # zip(strict=) is 3.10+; we target 3.11 but keep call sites terse
+    "RUF001",  # ambiguous unicode in prose strings (we use the proper minus sign)
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+# Deliberately permissive to start. Tighten as annotations land.
+check_untyped_defs = false
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: tests that touch the full committed dataset",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/scraper_*.py"]
