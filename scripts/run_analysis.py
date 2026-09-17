@@ -13,11 +13,7 @@ Usage::
 
 from __future__ import annotations
 
-import hashlib
-import json
-import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -25,7 +21,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src import hypothesis_tests as ht  # noqa: E402
-from src import models  # noqa: E402
+from src import models, provenance  # noqa: E402
 from src.utils import setup_logging  # noqa: E402
 
 log = setup_logging(__name__)
@@ -34,45 +30,12 @@ SAMPLE_PATH = Path("data/processed/analysis_sample.parquet")
 TABLES = Path("reports/tables")
 
 
-def _git_commit() -> str:
-    try:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                             capture_output=True, text=True, check=True, timeout=10)
-        dirty = subprocess.run(["git", "status", "--porcelain"],
-                               capture_output=True, text=True, check=True, timeout=10)
-        return sha.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
-    except (subprocess.SubprocessError, OSError):
-        return "unknown"
-
-
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def write_table(frame: pd.DataFrame, name: str, description: str) -> None:
     """Write *frame* to reports/tables/<name>.csv with a provenance sidecar."""
-    TABLES.mkdir(parents=True, exist_ok=True)
-    path = TABLES / f"{name}.csv"
-    frame.to_csv(path, index=False)
-    (TABLES / f"{name}.meta.json").write_text(
-        json.dumps(
-            {
-                "description": description,
-                "command": "python scripts/run_analysis.py",
-                "git_commit": _git_commit(),
-                "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "input": str(SAMPLE_PATH),
-                "input_sha256": _sha256(SAMPLE_PATH),
-                "rows": int(len(frame)),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    path = provenance.write_table(
+        frame, name, description,
+        command="python scripts/run_analysis.py",
+        inputs=[SAMPLE_PATH],
     )
     log.info("Wrote %s (%d rows)", path, len(frame))
 

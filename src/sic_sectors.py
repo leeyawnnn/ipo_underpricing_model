@@ -97,7 +97,9 @@ def sector_for_sic(sic: int | str | float | None) -> str:
     if sic is None or (isinstance(sic, float) and pd.isna(sic)):
         return UNCLASSIFIED
     try:
-        code = int(str(sic).strip())
+        # float() first, because a SIC read from a pandas column containing
+        # nulls arrives as "2834.0", which int() rejects outright.
+        code = int(float(str(sic).strip()))
     except (TypeError, ValueError):
         return UNCLASSIFIED
 

@@ -23,9 +23,18 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src import provenance  # noqa: E402
 from src.dataset import assemble, sample_funnel, selection_comparison  # noqa: E402
 from src.feature_engineering import build_all_features  # noqa: E402
 from src.utils import setup_logging  # noqa: E402
+
+COMMAND = "python scripts/build_dataset.py"
+SOURCES = [
+    Path("data/raw/ipo_calendar.csv"),
+    Path("data/raw/first_day_prices.csv"),
+    Path("data/external/company_sic_codes.csv"),
+    Path("data/raw/market_indices.csv"),
+]
 
 log = setup_logging(__name__)
 
@@ -48,13 +57,20 @@ def main() -> int:
         pd.to_numeric(df.get("split_factor"), errors="coerce").fillna(1.0) != 1.0
     ).astype(int)
 
-    TABLES.mkdir(parents=True, exist_ok=True)
     funnel = sample_funnel(df)
-    funnel.to_csv(TABLES / "sample_funnel.csv", index=False)
+    provenance.write_table(
+        funnel, "sample_funnel",
+        "IPOs surviving each data requirement, in the order applied",
+        command=COMMAND, inputs=SOURCES, directory=TABLES,
+    )
     log.info("Sample funnel:\n%s", funnel.to_string(index=False))
 
     comparison = selection_comparison(df)
-    comparison.to_csv(TABLES / "selection_comparison.csv", index=False)
+    provenance.write_table(
+        comparison, "selection_comparison",
+        "IPOs with a recovered prospectus compared against those without, on observables",
+        command=COMMAND, inputs=SOURCES, directory=TABLES,
+    )
     log.info("Selection comparison (filing recovered vs not):\n%s",
              comparison.to_string(index=False))
 
@@ -62,7 +78,11 @@ def main() -> int:
         df["sector"].value_counts(dropna=False).rename_axis("sector").reset_index(name="n")
     )
     coverage["pct"] = (coverage["n"] / len(df) * 100).round(1)
-    coverage.to_csv(TABLES / "sector_coverage.csv", index=False)
+    provenance.write_table(
+        coverage, "sector_coverage",
+        "Sector distribution over the full calendar, from SEC-assigned SIC codes",
+        command=COMMAND, inputs=SOURCES, directory=TABLES,
+    )
 
     FULL_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(FULL_PATH, index=False)

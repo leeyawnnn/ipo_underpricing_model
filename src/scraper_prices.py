@@ -120,7 +120,8 @@ def split_is_applied(
     # Restated: step near 1. Not restated: step near 1/ratio.
     restated_error = abs(np.log(step))
     raw_error = abs(np.log(step * ratio))
-    return restated_error <= raw_error
+    # bool(), not the numpy scalar: callers and tests treat this as a plain bool.
+    return bool(restated_error <= raw_error)
 
 
 def cumulative_split_factor(

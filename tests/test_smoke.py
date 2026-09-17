@@ -1,216 +1,181 @@
-"""
-Smoke tests — basic sanity checks that the source modules import and their
-core functions behave as documented on trivial inputs.
+"""Smoke tests for the shared utilities and the committed artifacts.
 
-Run with:
-    python -m pytest tests/test_smoke.py -v
+The substantive tests live in the other modules; this one covers src/utils.py
+and asserts that what the README points at actually exists on disk.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
+
 import numpy as np
-import pandas as pd
 import pytest
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 # ---------------------------------------------------------------------------
-# Utility tests
+# Utilities
 # ---------------------------------------------------------------------------
 
-def test_setup_logging_returns_logger():
+def test_setup_logging_returns_a_named_logger():
     from src.utils import setup_logging
-    import logging
+
     logger = setup_logging("test_logger")
     assert isinstance(logger, logging.Logger)
     assert logger.name == "test_logger"
 
 
+def test_setup_logging_does_not_duplicate_handlers():
+    from src.utils import setup_logging
+
+    first = setup_logging("dedupe_logger")
+    count = len(first.handlers)
+    second = setup_logging("dedupe_logger")
+    assert second is first
+    assert len(second.handlers) == count
+
+
 def test_safe_divide():
     from src.utils import safe_divide
+
     assert safe_divide(10, 2) == 5.0
     assert np.isnan(safe_divide(10, 0))
     assert safe_divide(10, 0, default=-1) == -1
 
 
-def test_retry_succeeds_on_first_attempt():
+def test_retry_succeeds_without_retrying():
     from src.utils import retry
-    calls = []
+
+    calls: list[int] = []
 
     @retry(max_attempts=3)
-    def good():
+    def good() -> str:
         calls.append(1)
-        return 42
+        return "ok"
 
-    result = good()
-    assert result == 42
+    assert good() == "ok"
     assert len(calls) == 1
 
 
-def test_retry_raises_after_max_attempts():
+def test_retry_gives_up_after_max_attempts():
     from src.utils import retry
-    calls = []
 
-    @retry(max_attempts=2, initial_wait=0)
-    def always_fails():
+    calls: list[int] = []
+
+    @retry(max_attempts=3, initial_wait=0.001, backoff_factor=1.0)
+    def bad() -> None:
         calls.append(1)
-        raise ValueError("boom")
+        raise ValueError("nope")
 
     with pytest.raises(ValueError):
-        always_fails()
-    assert len(calls) == 2
+        bad()
+    assert len(calls) == 3
 
 
 # ---------------------------------------------------------------------------
-# Text feature tests
+# Committed artifacts
 # ---------------------------------------------------------------------------
 
-def test_tokenise_basic():
-    from src.text_features import tokenise
-    tokens = tokenise("The firm's revenue grew 15% in Q3.")
-    assert isinstance(tokens, list)
-    assert all(isinstance(t, str) for t in tokens)
-    # Numbers-only tokens should be removed
-    assert "15" not in tokens
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "data/external/lm_sentiment_words.csv",
+        "data/external/underwriter_ranks.csv",
+        "data/external/sic_gics_crosswalk.csv",
+        "data/external/company_sic_codes.csv",
+        "data/processed/analysis_sample.parquet",
+        "data/raw/market_indices.csv",
+    ],
+)
+def test_committed_input_exists(relative):
+    assert (ROOT / relative).exists(), f"{relative} is referenced but not committed"
 
 
-def test_gunning_fog_empty():
-    from src.text_features import gunning_fog_index
-    result = gunning_fog_index("")
-    assert np.isnan(result)
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "reports/tables/hypothesis_summary.csv",
+        "reports/tables/model_cv_summary.csv",
+        "reports/tables/model_cv_per_fold.csv",
+        "reports/tables/model_holdout_2024.csv",
+        "reports/tables/sample_funnel.csv",
+        "reports/tables/h1_robustness.csv",
+        "reports/tables/descriptive_statistics.csv",
+    ],
+)
+def test_published_table_exists_and_has_provenance(relative):
+    path = ROOT / relative
+    assert path.exists(), f"{relative} is quoted in the README but not committed"
+    meta = path.with_suffix(".meta.json")
+    assert meta.exists(), f"{relative} has no provenance sidecar"
+    payload = json.loads(meta.read_text())
+    for key in ["command", "git_commit", "generated_utc", "input_sha256"]:
+        assert payload.get(key), f"{meta.name} is missing {key}"
 
 
-def test_gunning_fog_simple():
-    from src.text_features import gunning_fog_index
-    text = "The company sells widgets. Revenue grew last year."
-    result = gunning_fog_index(text)
-    assert isinstance(result, float)
-    assert result >= 0
+def test_every_expected_figure_is_committed():
+    from scripts.check_figures import EXPECTED
+
+    for name in EXPECTED:
+        assert (ROOT / "reports" / "figures" / name).exists(), f"{name} is missing"
 
 
-def test_compute_lm_ratios_empty():
-    from src.text_features import compute_lm_ratios
-    lm_dict = {"lm_negative": {"BAD", "WEAK"}, "lm_positive": {"GOOD", "STRONG"}}
-    result = compute_lm_ratios("", lm_dict)
-    for v in result.values():
-        assert np.isnan(v)
+def test_no_unfinished_work_markers_in_tracked_files():
+    """No TODO/FIXME/XXX or 'Phase N' scaffolding should survive in the repo.
+
+    This file is excluded: it has to name the markers in order to look for
+    them. The word 'placeholder' is not a marker here - it appears in prose
+    explaining placeholders that were removed.
+    """
+    import re
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "*.py", "*.md", "*.yml", "*.cff", "*.toml"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    pattern = re.compile(r"\b(TODO|FIXME|XXX)\b|\bPhase\s+\d\b")
+    offenders = []
+    for name in tracked:
+        if name == "tests/test_smoke.py":
+            continue
+        text = (ROOT / name).read_text(encoding="utf-8", errors="replace")
+        for match in pattern.finditer(text):
+            offenders.append(f"{name}: {match.group(0)}")
+    assert offenders == [], f"leftover markers: {offenders}"
 
 
-def test_compute_lm_ratios_known():
-    from src.text_features import compute_lm_ratios
-    lm_dict = {"lm_negative": {"BAD", "WEAK"}}
-    result = compute_lm_ratios("the company had bad results weak margins", lm_dict)
-    assert "lm_negative_ratio" in result
-    assert result["lm_negative_ratio"] == pytest.approx(2 / 7, abs=0.01)
+def test_throttle_enforces_a_minimum_interval():
+    import time
+
+    from src.utils import throttle
+
+    @throttle(calls_per_second=20.0)
+    def quick() -> None:
+        return None
+
+    start = time.monotonic()
+    for _ in range(4):
+        quick()
+    # Four calls at 20/s means at least three gaps of 50 ms.
+    assert time.monotonic() - start >= 0.12
 
 
-def test_prospectus_uniqueness_shape():
-    from src.text_features import compute_prospectus_uniqueness
-    texts = [
-        "The company operates in the technology sector and sells software.",
-        "Revenue grew by ten percent last year driven by enterprise sales.",
-        "Risk factors include competition and macroeconomic uncertainty.",
-        "The firm focuses on healthcare and medical device distribution.",
-        "Software revenue increased due to cloud subscription growth.",
-    ]
-    sectors = ["Tech", "Tech", "Tech", "Health", "Tech"]
-    result = compute_prospectus_uniqueness(texts, sectors)
-    assert result.shape == (5,)
-    assert np.all(result >= 0) and np.all(result <= 1.0 + 1e-6)
+def test_disk_cache_round_trips_and_avoids_recomputation(tmp_path):
+    from src.utils import disk_cache
 
+    calls: list[int] = []
 
-# ---------------------------------------------------------------------------
-# Feature engineering tests
-# ---------------------------------------------------------------------------
+    @disk_cache(tmp_path)
+    def expensive(x: int) -> int:
+        calls.append(x)
+        return x * 2
 
-def test_add_calendar_features():
-    from src.feature_engineering import add_calendar_features
-    df = pd.DataFrame({"ipo_date": pd.to_datetime(["2022-03-15", "2023-07-04", "2024-12-31"])})
-    result = add_calendar_features(df)
-    assert "ipo_year" in result.columns
-    assert "ipo_quarter" in result.columns
-    assert "is_quarter_end_month" in result.columns
-    # March is quarter-end
-    assert result.loc[0, "is_quarter_end_month"] == 1
-    # July is not quarter-end
-    assert result.loc[1, "is_quarter_end_month"] == 0
-
-
-def test_add_deal_features_log_columns():
-    from src.feature_engineering import add_deal_features
-    df = pd.DataFrame({
-        "offer_size_m": [50.0, 200.0, 1000.0],
-        "shares_offered": [5_000_000, 20_000_000, 100_000_000],
-        "lead_underwriter": ["Goldman Sachs", "JPMorgan", "Boutique LLC"],
-    })
-    result = add_deal_features(df)
-    assert "log_offer_size" in result.columns
-    assert "log_shares_offered" in result.columns
-    assert (result["log_offer_size"] > 0).all()
-
-
-# ---------------------------------------------------------------------------
-# Preprocessing tests
-# ---------------------------------------------------------------------------
-
-def test_missing_value_report():
-    from src.preprocessing import missing_value_report
-    df = pd.DataFrame({"a": [1, 2, None], "b": [None, None, 3]})
-    report = missing_value_report(df)
-    assert "pct_missing" in report.columns
-    # 'b' should appear first (more missing)
-    assert report.iloc[0]["column"] == "b"
-
-
-def test_winsorise_target():
-    from src.preprocessing import winsorise_target
-    data = pd.DataFrame({"underpricing": list(range(100)) + [1000, -500]})
-    result = winsorise_target(data)
-    assert "winsorized_underpricing" in result.columns
-    assert result["winsorized_underpricing"].max() < 1000
-    assert result["winsorized_underpricing"].min() > -500
-
-
-def test_drop_incomplete():
-    from src.preprocessing import drop_incomplete
-    df = pd.DataFrame({
-        "ticker": ["A", "B", None],
-        "ipo_date": pd.to_datetime(["2022-01-01", "2022-02-01", "2022-03-01"]),
-        "offer_price": [10.0, None, 15.0],
-        "first_day_close": [12.0, 14.0, 16.0],
-    })
-    result = drop_incomplete(df)
-    assert len(result) == 1  # only row A has all mandatory columns filled
-
-
-# ---------------------------------------------------------------------------
-# Models tests
-# ---------------------------------------------------------------------------
-
-def test_evaluate_perfect_predictions():
-    from src.models import evaluate
-    y = np.array([0.1, 0.2, 0.3, 0.4])
-    metrics = evaluate(y, y, "perfect")
-    assert metrics["mae"] == pytest.approx(0.0, abs=1e-10)
-    assert metrics["r2"] == pytest.approx(1.0, abs=1e-6)
-    assert metrics["spearman_rho"] == pytest.approx(1.0, abs=1e-6)
-
-
-def test_baseline_median():
-    from src.models import baseline_median
-    y_train = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
-    y_test = np.array([0.25, 0.35])
-    pred, metrics = baseline_median(y_train, y_test)
-    assert np.all(pred == pytest.approx(np.median(y_train)))
-
-
-def test_select_features_excludes_target():
-    from src.models import select_features
-    df = pd.DataFrame({
-        "underpricing": [0.1], "winsorized_underpricing": [0.1],
-        "ticker": ["A"], "log_offer_size": [10.0], "vix_at_pricing": [20.0],
-    })
-    features = select_features(df)
-    assert "winsorized_underpricing" not in features
-    assert "underpricing" not in features
-    assert "ticker" not in features
-    assert "log_offer_size" in features
+    assert expensive(21) == 42
+    assert expensive(21) == 42
+    assert calls == [21], "the second call should have been served from disk"
+    assert expensive(5) == 10
+    assert calls == [21, 5]

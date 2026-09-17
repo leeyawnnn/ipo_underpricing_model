@@ -7,11 +7,12 @@ Implements three academic measures:
    uncertainty, litigious, modal-strong, and modal-weak word ratios
    computed against the LM Master Dictionary.
 
-2. **Hanley-Hoberg (2010) prospectus informativeness** — TF-IDF cosine
-   similarity of each prospectus against the sector-average TF-IDF vector.
-   ``prospectus_uniqueness = 1 - similarity``.
+2. **Readability — Gunning Fog Index**, applied to the MD&A section.
 
-3. **Readability — Gunning Fog Index** applied to the MD&A section.
+Hanley-Hoberg prospectus uniqueness lives in
+:func:`src.feature_engineering.expanding_prospectus_uniqueness`, because it
+needs the corpus in listing order to avoid comparing a filing against
+prospectuses that did not exist yet.
 
 All functions operate on plain-text strings; I/O of files lives in the
 calling notebook or pipeline script.
@@ -22,10 +23,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from src.utils import setup_logging
 
@@ -237,148 +235,3 @@ def gunning_fog_index(text: str) -> float:
 
     fog = 0.4 * ((n_words / n_sentences) + 100 * (n_complex / n_words))
     return round(fog, 4)
-
-
-# ---------------------------------------------------------------------------
-# Prospectus uniqueness (Hanley-Hoberg simplified)
-# ---------------------------------------------------------------------------
-
-def compute_prospectus_uniqueness(
-    texts: list[str],
-    sectors: list[str],
-    max_features: int = 5000,
-    ngram_range: tuple[int, int] = (1, 2),
-) -> np.ndarray:
-    """Compute each prospectus's uniqueness relative to its sector average.
-
-    Implements the Hanley-Hoberg (2010) boilerplate measure:
-    ``prospectus_uniqueness = 1 - cosine_similarity(doc_tfidf, sector_mean_tfidf)``
-
-    Args:
-        texts: List of full prospectus plain-text strings (one per IPO).
-        sectors: List of sector labels aligned with *texts*.
-        max_features: Maximum vocabulary size for TF-IDF.
-        ngram_range: n-gram range for TF-IDF vectorisation.
-
-    Returns:
-        Numpy array of uniqueness scores in [0, 1], one per prospectus.
-        Values close to 0 indicate boilerplate; values near 1 indicate
-        distinctive content.
-    """
-    if len(texts) != len(sectors):
-        raise ValueError("texts and sectors must have the same length")
-
-    vectoriser = TfidfVectorizer(
-        max_features=max_features,
-        ngram_range=ngram_range,
-        stop_words="english",
-        sublinear_tf=True,
-        min_df=2,
-    )
-
-    tfidf_matrix = vectoriser.fit_transform(texts)  # shape (n_docs, n_features)
-
-    sectors_arr = np.array(sectors)
-    uniqueness = np.zeros(len(texts))
-
-    for sector in np.unique(sectors_arr):
-        mask = sectors_arr == sector
-        sector_indices = np.where(mask)[0]
-
-        if len(sector_indices) < 2:
-            # With only one document in the sector, similarity is 1 by definition
-            uniqueness[sector_indices] = 0.0
-            continue
-
-        sector_vectors = tfidf_matrix[sector_indices]
-
-        # Sector mean TF-IDF vector
-        sector_mean = np.asarray(sector_vectors.mean(axis=0))  # (1, n_features)
-
-        # Similarity of each doc to the sector mean
-        sims = cosine_similarity(sector_vectors, sector_mean)  # (n_sector, 1)
-        uniqueness[sector_indices] = 1.0 - sims.flatten()
-
-    return uniqueness
-
-
-# ---------------------------------------------------------------------------
-# Aggregate feature extraction (used by the notebook pipeline)
-# ---------------------------------------------------------------------------
-
-def build_text_features(
-    df: pd.DataFrame,
-    lm_dict: dict[str, set[str]],
-    s1_dir: Path = Path("data/raw/s1_filings"),
-) -> pd.DataFrame:
-    """Compute all text features for every ticker in *df*.
-
-    Reads full-text, risk-factors, and MD&A files from *s1_dir*.
-
-    Args:
-        df: IPO DataFrame with at least columns ``ticker`` and ``ipo_date``,
-            plus ``sector`` for the uniqueness computation.
-        lm_dict: Loaded LM dictionary.
-        s1_dir: Directory containing ``{ticker}_{date}.txt`` files.
-
-    Returns:
-        DataFrame indexed like *df* with text feature columns appended.
-    """
-    records: list[dict] = []
-
-    full_texts: list[str] = []
-    sectors: list[str] = []
-    valid_indices: list[int] = []
-
-    for idx, row in df.iterrows():
-        ticker = str(row["ticker"]).upper()
-        date_str = str(row["ipo_date"])[:10]
-        stem = f"{ticker}_{date_str}"
-
-        full_path = s1_dir / f"{stem}.txt"
-        risk_path = s1_dir / f"{stem}_risk_factors.txt"
-        mda_path = s1_dir / f"{stem}_mda.txt"
-
-        record: dict = {"ticker": ticker}
-
-        if not full_path.exists():
-            log.warning("%s: no S-1 text file found", stem)
-            records.append(record)
-            continue
-
-        full_text = full_path.read_text(encoding="utf-8", errors="replace")
-        risk_text = risk_path.read_text(encoding="utf-8", errors="replace") if risk_path.exists() else ""
-        mda_text = mda_path.read_text(encoding="utf-8", errors="replace") if mda_path.exists() else ""
-
-        # LM ratios — full prospectus
-        full_ratios = compute_lm_ratios(full_text, lm_dict)
-        for k, v in full_ratios.items():
-            record[k] = v
-
-        # LM ratios — risk factors section
-        risk_ratios = compute_lm_ratios(risk_text, lm_dict)
-        for k, v in risk_ratios.items():
-            record[f"rf_{k}"] = v
-
-        # Readability
-        record["fog_index_mda"] = gunning_fog_index(mda_text)
-
-        # Word counts
-        record["total_prospectus_word_count"] = full_ratios.get("word_count", 0)
-        record["risk_factors_word_count"] = risk_ratios.get("word_count", 0)
-        record["mda_word_count"] = len(tokenise(mda_text))
-
-        full_texts.append(full_text)
-        sectors.append(str(row.get("sector", "Unknown")))
-        valid_indices.append(len(records))
-
-        records.append(record)
-
-    # Prospectus uniqueness requires the full corpus
-    if full_texts:
-        uniqueness = compute_prospectus_uniqueness(full_texts, sectors)
-        for rank, idx in enumerate(valid_indices):
-            records[idx]["prospectus_uniqueness"] = float(uniqueness[rank])
-
-    result = pd.DataFrame(records, index=df.index)
-    return result
