@@ -1,0 +1,88 @@
+sic_low,sic_high,sector,note
+100,999,Consumer Staples,Agricultural production
+1000,1099,Materials,Metal mining
+1200,1299,Energy,Coal mining
+1300,1399,Energy,Oil and gas extraction
+1400,1499,Materials,Mining and quarrying of nonmetallic minerals
+1500,1799,Industrials,Construction
+2000,2099,Consumer Staples,Food and kindred products
+2100,2199,Consumer Staples,Tobacco products
+2200,2299,Consumer Discretionary,Textile mill products
+2300,2399,Consumer Discretionary,Apparel
+2400,2499,Materials,Lumber and wood products
+2500,2599,Consumer Discretionary,Furniture and fixtures
+2600,2699,Materials,Paper and allied products
+2700,2799,Communication Services,Printing and publishing
+2800,2819,Materials,Industrial inorganic chemicals
+2820,2829,Materials,Plastics and synthetic resins
+2830,2836,Healthcare,"Drugs, diagnostics and biological products"
+2840,2844,Consumer Staples,Soap and cosmetics
+2850,2899,Materials,"Paints, industrial organic chemicals, agricultural chemicals"
+2900,2999,Energy,Petroleum refining
+3000,3099,Materials,Rubber and plastics products
+3100,3199,Consumer Discretionary,Leather and footwear
+3200,3299,Materials,"Stone, clay and glass products"
+3300,3399,Materials,Primary metal industries
+3400,3499,Industrials,Fabricated metal products
+3500,3569,Industrials,Industrial and commercial machinery
+3570,3579,Technology,Computer and office equipment
+3580,3599,Industrials,Service industry and general machinery
+3600,3619,Technology,Electronic distribution equipment
+3620,3629,Industrials,Electrical industrial apparatus
+3630,3639,Consumer Discretionary,Household appliances
+3640,3649,Industrials,Lighting and wiring equipment
+3650,3699,Technology,"Audio and video equipment, semiconductors, electronic components"
+3700,3719,Consumer Discretionary,Motor vehicles and equipment
+3720,3729,Industrials,Aircraft and parts
+3730,3799,Industrials,"Ship, rail and other transportation equipment"
+3800,3825,Technology,"Search, navigation and measuring instruments"
+3826,3829,Healthcare,Laboratory analytical instruments
+3830,3839,Healthcare,"Optical, medical and ophthalmic goods"
+3840,3851,Healthcare,Surgical and medical instruments
+3860,3899,Consumer Discretionary,"Photographic equipment, jewellery, toys"
+3900,3999,Consumer Discretionary,Miscellaneous manufacturing
+4000,4499,Industrials,"Railroad, trucking, water transportation"
+4500,4599,Industrials,Air transportation
+4600,4699,Energy,Pipelines except natural gas
+4700,4799,Industrials,Transportation services
+4800,4899,Communication Services,Communications
+4900,4999,Utilities,Electric and gas utilities
+5000,5099,Industrials,Wholesale trade in durable goods
+5100,5139,Consumer Discretionary,Wholesale trade in apparel and paper
+5140,5159,Consumer Staples,Wholesale trade in groceries and farm products
+5160,5199,Materials,Wholesale trade in chemicals and petroleum
+5200,5399,Consumer Discretionary,"Building materials and general merchandise stores"
+5400,5499,Consumer Staples,Food stores
+5500,5599,Consumer Discretionary,Automotive dealers and service stations
+5600,5699,Consumer Discretionary,Apparel and accessory stores
+5700,5899,Consumer Discretionary,"Home furnishings, eating and drinking places"
+5900,5911,Consumer Staples,Drug stores
+5912,5999,Consumer Discretionary,Miscellaneous retail
+6000,6199,Financials,Depository and nondepository credit institutions
+6200,6299,Financials,Security and commodity brokers
+6300,6499,Financials,Insurance
+6500,6599,Real Estate,Real estate
+6600,6769,Financials,Combined real estate and investment offices
+6770,6770,SPAC,Blank checks
+6771,6797,Financials,Holding and other investment offices
+6798,6798,Real Estate,Real estate investment trusts
+6799,6799,Financials,Investors not elsewhere classified
+7000,7099,Consumer Discretionary,Hotels and lodging
+7200,7299,Consumer Discretionary,Personal services
+7300,7319,Communication Services,Advertising
+7320,7369,Industrials,"Credit reporting, services to buildings, help supply"
+7370,7379,Technology,Computer programming and data processing
+7380,7389,Industrials,Miscellaneous business services
+7500,7699,Consumer Discretionary,Automotive and miscellaneous repair services
+7800,7899,Communication Services,Motion pictures
+7900,7999,Consumer Discretionary,Amusement and recreation services
+8000,8099,Healthcare,Health services
+8100,8199,Industrials,Legal services
+8200,8299,Consumer Discretionary,Educational services
+8300,8399,Healthcare,Social services
+8600,8699,Industrials,Membership organisations
+8700,8730,Industrials,"Engineering, accounting and management services"
+8731,8734,Healthcare,Commercial physical and biological research
+8735,8799,Industrials,Research and management services not elsewhere classified
+8880,8888,Industrials,Foreign governments and unclassified establishments
+9000,9999,Industrials,Public administration and nonclassifiable establishments

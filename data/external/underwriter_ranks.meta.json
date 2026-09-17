@@ -1,0 +1,11 @@
+{
+  "source_page": "https://site.warrington.ufl.edu/ritter/ipo-data/",
+  "source_url": "https://site.warrington.ufl.edu/ritter/files/Underwriter-Rank.xls",
+  "source_sha256": "bd10e6908faabf3f5304b78b9a7761fc52922d08133e8ef81d795998937340c3",
+  "access_date": "2026-09-17",
+  "derived_by": "python scripts/fetch_underwriter_ranks.py",
+  "n_rows": 843,
+  "n_underwriters": 179,
+  "scale": "Carter-Manaster 0-9, Ritter updates of Loughran-Ritter (2004)",
+  "note": "Ranks are period-specific; rows are expanded to one per listing year."
+}

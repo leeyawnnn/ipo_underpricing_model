@@ -68,3 +68,6 @@ htmlcov/
 
 # Superseded by data/external/lm_sentiment_words.csv (derived subset).
 data/external/lm_dictionary.csv
+
+# Fetched by scripts/fetch_underwriter_ranks.py
+data/external/ritter_underwriter_rank.xls

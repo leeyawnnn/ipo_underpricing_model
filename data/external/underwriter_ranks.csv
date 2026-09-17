@@ -1,56 +1,844 @@
-underwriter,rank
-Goldman Sachs,9
-Morgan Stanley,9
-J.P. Morgan,9
-JPMorgan,9
-JP Morgan,9
-Citigroup,8
-BofA Securities,8
-Bank of America,8
-Barclays,8
-Deutsche Bank,8
-Credit Suisse,8
-UBS,8
-Wells Fargo,8
-Jefferies,8
-RBC Capital,7
-Cowen,7
-William Blair,7
-Stifel,7
-Piper Sandler,7
-Raymond James,7
-Canaccord,7
-BMO Capital,7
-BTIG,7
-Guggenheim,7
-Needham,7
-Oppenheimer,7
-Truist,7
-KeyBanc,7
-Ladenburg Thalmann,6
-Roth Capital,6
-Lake Street,6
-Maxim Group,6
-ThinkEquity,6
-Aegis Capital,6
-EF Hutton,6
-Chardan,6
-Craig-Hallum,6
-Loop Capital,6
-Wedbush,6
-D.A. Davidson,6
-I-Bankers,5
-Kingswood,5
-Alexander Capital,5
-Boustead,5
-National Securities,5
-WallachBeth,5
-Network 1,5
-Revere Securities,5
-Dawson James,5
-Joseph Gunnar,4
-Prime Number,4
-WestPark Capital,4
-ViewTrade,3
-Tiger Brokers,3
-US Tiger,3
+underwriter,year,rank,source_column
+A.G.P/Alliance Global Partners,2021,3.0,Rank2122
+A.G.P/Alliance Global Partners,2022,3.0,Rank2122
+A.G.P/Alliance Global Partners,2023,3.0,Rank23
+A.G.P/Alliance Global Partners,2024,3.0,Rank24
+AC Sunshine Securities LLC,2023,2.0,Rank23
+AC Sunshine Securities LLC,2024,2.0,Rank24
+AMTD Global Markets,2018,7.5,Rank1820
+AMTD Global Markets,2019,7.5,Rank1820
+AMTD Global Markets,2020,7.5,Rank1820
+AMTD Global Markets,2021,7.5,Rank2122
+AMTD Global Markets,2022,7.5,Rank2122
+AMTD Global Markets,2023,7.5,Rank23
+Absa Bank Ltd,2021,7.0,Rank2122
+Absa Bank Ltd,2022,7.0,Rank2122
+Aegis Capital,2018,3.0,Rank1820
+Aegis Capital,2019,3.0,Rank1820
+Aegis Capital,2020,3.0,Rank1820
+Aegis Capital,2021,3.0,Rank2122
+Aegis Capital,2022,3.0,Rank2122
+Aegis Capital,2023,2.0,Rank23
+Aegis Capital,2024,2.0,Rank24
+"Alexander Capital, LP",2018,2.0,Rank1820
+"Alexander Capital, LP",2019,2.0,Rank1820
+"Alexander Capital, LP",2020,2.0,Rank1820
+"Alexander Capital, LP",2021,2.0,Rank2122
+"Alexander Capital, LP",2022,2.0,Rank2122
+"Alexander Capital, LP",2023,2.0,Rank23
+"Alexander Capital, LP",2024,2.0,Rank24
+Allen & Co Inc,2018,8.0,Rank1820
+Allen & Co Inc,2019,8.0,Rank1820
+Allen & Co Inc,2020,8.0,Rank1820
+Allen & Co Inc,2021,8.0,Rank2122
+Allen & Co Inc,2022,8.0,Rank2122
+Allen & Co Inc,2023,8.0,Rank23
+Allen & Co Inc,2024,8.0,Rank24
+Alliance Global (see A.G.P.),2018,3.0,Rank1820
+Alliance Global (see A.G.P.),2019,3.0,Rank1820
+Alliance Global (see A.G.P.),2020,3.0,Rank1820
+Alliance Global (see A.G.P.),2021,3.0,Rank2122
+Alliance Global (see A.G.P.),2022,3.0,Rank2122
+Alliance Global (see A.G.P.),2023,3.0,Rank23
+Alliance Global (see A.G.P.),2024,3.0,Rank24
+American Trust Investment Services,2024,2.0,Rank24
+Apollo,2024,8.0,Rank24
+Axiom-Cap,2018,4.0,Rank1820
+Axiom-Cap,2019,4.0,Rank1820
+Axiom-Cap,2020,4.0,Rank1820
+Axiom-Cap,2021,3.0,Rank2122
+Axiom-Cap,2022,3.0,Rank2122
+Axiom-Cap,2023,3.0,Rank23
+Axiom-Cap,2024,3.0,Rank24
+B-Riley,2018,5.0,Rank1820
+B-Riley,2019,5.0,Rank1820
+B-Riley,2020,5.0,Rank1820
+B-Riley,2021,5.0,Rank2122
+B-Riley,2022,5.0,Rank2122
+B-Riley,2023,5.0,Rank23
+B-Riley,2024,5.0,Rank24
+B-Riley-FBR,2018,5.0,Rank1820
+B-Riley-FBR,2019,5.0,Rank1820
+B-Riley-FBR,2020,5.0,Rank1820
+BC Partners,2018,7.0,Rank1820
+BC Partners,2019,7.0,Rank1820
+BC Partners,2020,7.0,Rank1820
+BC Partners,2021,7.0,Rank2122
+BC Partners,2022,7.0,Rank2122
+BMO Capital Markets,2018,7.5,Rank1820
+BMO Capital Markets,2019,7.5,Rank1820
+BMO Capital Markets,2020,7.5,Rank1820
+BMO Capital Markets,2021,7.5,Rank2122
+BMO Capital Markets,2022,7.5,Rank2122
+BMO Capital Markets,2023,7.5,Rank23
+BMO Capital Markets,2024,7.5,Rank24
+BNP Paribas SA (BNP-CA),2018,8.0,Rank1820
+BNP Paribas SA (BNP-CA),2019,8.0,Rank1820
+BNP Paribas SA (BNP-CA),2020,8.0,Rank1820
+BNP Paribas SA (BNP-CA),2021,8.0,Rank2122
+BNP Paribas SA (BNP-CA),2022,8.0,Rank2122
+BNP Paribas SA (BNP-CA),2023,8.0,Rank23
+BNP Paribas SA (BNP-CA),2024,8.0,Rank24
+BOCI Asia,2018,4.0,Rank1820
+BOCI Asia,2019,4.0,Rank1820
+BOCI Asia,2020,4.0,Rank1820
+BTG Pactual,2021,7.5,Rank2122
+BTG Pactual,2022,7.5,Rank2122
+BTIG,2018,6.5,Rank1820
+BTIG,2019,6.5,Rank1820
+BTIG,2020,6.5,Rank1820
+BTIG,2021,6.5,Rank2122
+BTIG,2022,6.5,Rank2122
+BTIG,2023,6.5,Rank23
+BTIG,2024,6.5,Rank24
+Banco Bradesco,2018,8.0,Rank1820
+Banco Bradesco,2019,8.0,Rank1820
+Banco Bradesco,2020,8.0,Rank1820
+Banco Bradesco,2021,8.0,Rank2122
+Banco Bradesco,2022,8.0,Rank2122
+"Bancroft Capital, LLC",2024,3.0,Rank24
+Bank of America-Merrill Lynch (BOA-Merrill),2018,8.5,Rank1820
+Bank of America-Merrill Lynch (BOA-Merrill),2019,8.5,Rank1820
+Bank of America-Merrill Lynch (BOA-Merrill),2020,8.5,Rank1820
+Bank of America-Merrill Lynch (BOA-Merrill),2021,8.5,Rank2122
+Bank of America-Merrill Lynch (BOA-Merrill),2022,8.5,Rank2122
+Bank of America-Merrill Lynch (BOA-Merrill),2023,8.5,Rank23
+Bank of America-Merrill Lynch (BOA-Merrill),2024,8.5,Rank24
+Barclays Capital,2018,8.0,Rank1820
+Barclays Capital,2019,8.0,Rank1820
+Barclays Capital,2020,8.0,Rank1820
+Barclays Capital,2021,8.0,Rank2122
+Barclays Capital,2022,8.0,Rank2122
+Barclays Capital,2023,8.0,Rank23
+Barclays Capital,2024,8.0,Rank24
+Benchmark Company (The),2018,4.0,Rank1820
+Benchmark Company (The),2019,4.0,Rank1820
+Benchmark Company (The),2020,4.0,Rank1820
+Benchmark Company (The),2021,3.0,Rank2122
+Benchmark Company (The),2022,3.0,Rank2122
+Benchmark Company (The),2023,2.0,Rank23
+Benchmark Company (The),2024,2.0,Rank24
+Benjamin Securities,2023,2.0,Rank23
+Benjamin Securities,2024,2.0,Rank24
+Berenberg,2018,6.0,Rank1820
+Berenberg,2019,6.0,Rank1820
+Berenberg,2020,6.0,Rank1820
+Berenberg,2021,6.0,Rank2122
+Berenberg,2022,6.0,Rank2122
+Boustead Securities,2018,2.0,Rank1820
+Boustead Securities,2019,2.0,Rank1820
+Boustead Securities,2020,2.0,Rank1820
+Boustead Securities,2021,2.0,Rank2122
+Boustead Securities,2022,2.0,Rank2122
+Boustead Securities,2023,2.0,Rank23
+Boustead Securities,2024,2.0,Rank24
+Brookline,2018,4.0,Rank1820
+Brookline,2019,4.0,Rank1820
+Brookline,2020,4.0,Rank1820
+Brookline,2021,4.0,Rank2122
+Brookline,2022,4.0,Rank2122
+Brookline,2023,3.0,Rank23
+Brookline,2024,2.0,Rank24
+CIBC Oppenheimer,2018,7.5,Rank1820
+CIBC Oppenheimer,2019,7.5,Rank1820
+CIBC Oppenheimer,2020,7.5,Rank1820
+CIBC Oppenheimer,2021,7.5,Rank2122
+CIBC Oppenheimer,2022,7.5,Rank2122
+CLSA,2018,6.5,Rank1820
+CLSA,2019,6.5,Rank1820
+CLSA,2020,6.5,Rank1820
+CLSA,2021,6.5,Rank2122
+CLSA,2022,6.5,Rank2122
+CMB International Capital Ltd,2018,7.0,Rank1820
+CMB International Capital Ltd,2019,7.0,Rank1820
+CMB International Capital Ltd,2020,7.0,Rank1820
+CMB International Capital Ltd,2021,7.0,Rank2122
+CMB International Capital Ltd,2022,7.0,Rank2122
+CMB International Capital Ltd,2023,7.0,Rank23
+Canaccord Genuity,2018,6.5,Rank1820
+Canaccord Genuity,2019,6.5,Rank1820
+Canaccord Genuity,2020,6.5,Rank1820
+Canaccord Genuity,2021,6.5,Rank2122
+Canaccord Genuity,2022,6.5,Rank2122
+Cantor,2023,6.0,Rank23
+Cantor,2024,6.5,Rank24
+"Cantor, Fitzgerald & Co., Inc.",2018,6.0,Rank1820
+"Cantor, Fitzgerald & Co., Inc.",2019,6.0,Rank1820
+"Cantor, Fitzgerald & Co., Inc.",2020,6.0,Rank1820
+"Cantor, Fitzgerald & Co., Inc.",2021,6.0,Rank2122
+"Cantor, Fitzgerald & Co., Inc.",2022,6.0,Rank2122
+"Cantor, Fitzgerald & Co., Inc.",2023,6.0,Rank23
+Castleoak,2023,7.0,Rank23
+Cathay,2024,3.0,Rank24
+"Chardan Capital Markets, LLC",2018,4.0,Rank1820
+"Chardan Capital Markets, LLC",2019,4.0,Rank1820
+"Chardan Capital Markets, LLC",2020,4.0,Rank1820
+"Chardan Capital Markets, LLC",2021,4.0,Rank2122
+"Chardan Capital Markets, LLC",2022,4.0,Rank2122
+"Chardan Capital Markets, LLC",2023,4.0,Rank23
+"Chardan Capital Markets, LLC",2024,4.0,Rank24
+China International Capital Corp (CICC),2018,8.5,Rank1820
+China International Capital Corp (CICC),2019,8.5,Rank1820
+China International Capital Corp (CICC),2020,8.5,Rank1820
+China International Capital Corp (CICC),2021,8.5,Rank2122
+China International Capital Corp (CICC),2022,8.5,Rank2122
+China International Capital Corp (CICC),2023,8.5,Rank23
+China International Capital Corp (CICC),2024,8.5,Rank24
+China Investment Securities International,2018,7.5,Rank1820
+China Investment Securities International,2019,7.5,Rank1820
+China Investment Securities International,2020,7.5,Rank1820
+China Merchants Securities,2018,4.0,Rank1820
+China Merchants Securities,2019,4.0,Rank1820
+China Merchants Securities,2020,4.0,Rank1820
+China Renaissance (CRS),2018,8.0,Rank1820
+China Renaissance (CRS),2019,8.0,Rank1820
+China Renaissance (CRS),2020,8.0,Rank1820
+China Renaissance (CRS),2021,8.0,Rank2122
+China Renaissance (CRS),2022,8.0,Rank2122
+China Renaissance (CRS),2023,8.0,Rank23
+Citicorp Securities Inc,2018,9.0,Rank1820
+Citicorp Securities Inc,2019,9.0,Rank1820
+Citicorp Securities Inc,2020,9.0,Rank1820
+Citigroup,2018,8.5,Rank1820
+Citigroup,2019,8.5,Rank1820
+Citigroup,2020,8.5,Rank1820
+Citigroup,2021,8.5,Rank2122
+Citigroup,2022,8.5,Rank2122
+Citigroup,2023,8.5,Rank23
+Citigroup,2024,8.5,Rank24
+Citigroup Global Markets Inc,2018,9.0,Rank1820
+Citigroup Global Markets Inc,2019,9.0,Rank1820
+Citigroup Global Markets Inc,2020,9.0,Rank1820
+Clarksons Platou,2021,6.0,Rank2122
+Clarksons Platou,2022,6.0,Rank2122
+Clear Street,2024,3.0,Rank24
+Code Advisors,2021,7.0,Rank2122
+Code Advisors,2022,7.0,Rank2122
+Cohen & Co,2024,2.0,Rank24
+Cowen,2018,7.0,Rank1820
+Cowen,2019,7.0,Rank1820
+Cowen,2020,7.0,Rank1820
+Cowen,2021,7.0,Rank2122
+Cowen,2022,7.0,Rank2122
+Craft Capital,2021,3.0,Rank2122
+Craft Capital,2022,3.0,Rank2122
+Craft Capital,2023,3.0,Rank23
+Craft Capital,2024,3.0,Rank24
+"Craig-Hallum, Inc.",2018,4.0,Rank1820
+"Craig-Hallum, Inc.",2019,4.0,Rank1820
+"Craig-Hallum, Inc.",2020,4.0,Rank1820
+"Craig-Hallum, Inc.",2021,4.0,Rank2122
+"Craig-Hallum, Inc.",2022,4.0,Rank2122
+Credit Suisse,2018,8.5,Rank1820
+Credit Suisse,2019,8.5,Rank1820
+Credit Suisse,2020,8.5,Rank1820
+Credit Suisse,2021,8.0,Rank2122
+Credit Suisse,2022,8.0,Rank2122
+Credit Suisse,2023,8.0,Rank23
+D. Boral Capital,2024,2.0,Rank24
+DA Davidson & Co Inc,2018,5.0,Rank1820
+DA Davidson & Co Inc,2019,5.0,Rank1820
+DA Davidson & Co Inc,2020,5.0,Rank1820
+DA Davidson & Co Inc,2021,5.0,Rank2122
+DA Davidson & Co Inc,2022,5.0,Rank2122
+Davidson,2018,5.0,Rank1820
+Davidson,2019,5.0,Rank1820
+Davidson,2020,5.0,Rank1820
+Davidson,2021,5.0,Rank2122
+Davidson,2022,5.0,Rank2122
+"Dawson James Securities, Inc.",2018,2.0,Rank1820
+"Dawson James Securities, Inc.",2019,2.0,Rank1820
+"Dawson James Securities, Inc.",2020,2.0,Rank1820
+"Dawson James Securities, Inc.",2021,2.0,Rank2122
+"Dawson James Securities, Inc.",2022,2.0,Rank2122
+"Dawson James Securities, Inc.",2024,2.0,Rank24
+Deutsche Bank Securities Corp,2018,8.5,Rank1820
+Deutsche Bank Securities Corp,2019,8.5,Rank1820
+Deutsche Bank Securities Corp,2020,8.5,Rank1820
+Deutsche Bank Securities Corp,2021,8.0,Rank2122
+Deutsche Bank Securities Corp,2022,8.0,Rank2122
+Deutsche Bank Securities Corp,2023,8.0,Rank23
+Deutsche Bank Securities Corp,2024,8.0,Rank24
+Digital,2021,2.0,Rank2122
+Digital,2022,2.0,Rank2122
+Digital,2023,2.0,Rank23
+Dominari Securities,2024,2.0,Rank24
+Drexel Hamilton,2021,5.0,Rank2122
+Drexel Hamilton,2022,5.0,Rank2122
+Drexel Hamilton,2023,5.0,Rank23
+EF Hutton & Co Inc (EFH),2018,4.0,Rank1820
+EF Hutton & Co Inc (EFH),2019,4.0,Rank1820
+EF Hutton & Co Inc (EFH),2020,4.0,Rank1820
+EF Hutton & Co Inc (EFH),2021,4.0,Rank2122
+EF Hutton & Co Inc (EFH),2022,4.0,Rank2122
+EF Hutton & Co Inc (EFH),2023,2.0,Rank23
+EF Hutton & Co Inc (EFH),2024,2.0,Rank24
+EarlyBirdCapital Inc,2018,5.0,Rank1820
+EarlyBirdCapital Inc,2019,5.0,Rank1820
+EarlyBirdCapital Inc,2020,5.0,Rank1820
+EarlyBirdCapital Inc,2021,5.0,Rank2122
+EarlyBirdCapital Inc,2022,5.0,Rank2122
+EarlyBirdCapital Inc,2023,5.0,Rank23
+EarlyBirdCapital Inc,2024,5.0,Rank24
+Eddid Securities USA,2024,3.0,Rank24
+Evercore,2018,7.0,Rank1820
+Evercore,2019,7.0,Rank1820
+Evercore,2020,7.0,Rank1820
+Evercore,2021,7.0,Rank2122
+Evercore,2022,7.0,Rank2122
+Evercore,2023,7.5,Rank23
+Evercore,2024,7.5,Rank24
+Feltl & Co,2018,4.0,Rank1820
+Feltl & Co,2019,4.0,Rank1820
+Feltl & Co,2020,4.0,Rank1820
+Freedom Capital Markets,2023,2.0,Rank23
+Futu Securities International (HK),2021,7.5,Rank2122
+Futu Securities International (HK),2022,7.5,Rank2122
+GF Securities (Hong Kong),2021,2.0,Rank2122
+GF Securities (Hong Kong),2022,2.0,Rank2122
+Goldman Sachs & Co,2018,9.0,Rank1820
+Goldman Sachs & Co,2019,9.0,Rank1820
+Goldman Sachs & Co,2020,9.0,Rank1820
+Goldman Sachs & Co,2021,9.0,Rank2122
+Goldman Sachs & Co,2022,9.0,Rank2122
+Goldman Sachs & Co,2023,9.0,Rank23
+Goldman Sachs & Co,2024,9.0,Rank24
+Goldman Sachs Asia,2018,9.0,Rank1820
+Goldman Sachs Asia,2019,9.0,Rank1820
+Goldman Sachs Asia,2020,9.0,Rank1820
+Goldman Sachs Asia,2021,9.0,Rank2122
+Goldman Sachs Asia,2022,9.0,Rank2122
+Goldman Sachs Asia,2023,9.0,Rank23
+Goldman Sachs International,2018,9.0,Rank1820
+Goldman Sachs International,2019,9.0,Rank1820
+Goldman Sachs International,2020,9.0,Rank1820
+Goldman Sachs International,2021,9.0,Rank2122
+Goldman Sachs International,2022,9.0,Rank2122
+Goldman Sachs International,2023,9.0,Rank23
+Guggenheim Securities,2018,6.5,Rank1820
+Guggenheim Securities,2019,6.5,Rank1820
+Guggenheim Securities,2020,6.5,Rank1820
+Guggenheim Securities,2021,6.5,Rank2122
+Guggenheim Securities,2022,6.5,Rank2122
+Guggenheim Securities,2023,7.0,Rank23
+Guggenheim Securities,2024,7.0,Rank24
+Gunnar (see Joseph Gunnar),2018,2.0,Rank1820
+Gunnar (see Joseph Gunnar),2019,2.0,Rank1820
+Gunnar (see Joseph Gunnar),2020,2.0,Rank1820
+Gunnar (see Joseph Gunnar),2021,2.0,Rank2122
+Gunnar (see Joseph Gunnar),2022,2.0,Rank2122
+Gunnar (see Joseph Gunnar),2024,2.0,Rank24
+HC Wainwright & Co Inc,2018,6.5,Rank1820
+HC Wainwright & Co Inc,2019,6.5,Rank1820
+HC Wainwright & Co Inc,2020,6.5,Rank1820
+HC Wainwright & Co Inc,2021,6.5,Rank2122
+HC Wainwright & Co Inc,2022,6.5,Rank2122
+HC Wainwright & Co Inc,2023,6.5,Rank23
+HSBC,2018,8.0,Rank1820
+HSBC,2019,8.0,Rank1820
+HSBC,2020,8.0,Rank1820
+HSBC,2021,8.0,Rank2122
+HSBC,2022,8.0,Rank2122
+Haitong International,2018,8.0,Rank1820
+Haitong International,2019,8.0,Rank1820
+Haitong International,2020,8.0,Rank1820
+Hovde Group,2018,6.0,Rank1820
+Hovde Group,2019,6.0,Rank1820
+Hovde Group,2020,6.0,Rank1820
+Huatai Securities,2018,7.0,Rank1820
+Huatai Securities,2019,7.0,Rank1820
+Huatai Securities,2020,7.0,Rank1820
+Huatai Securities,2021,7.0,Rank2122
+Huatai Securities,2022,7.0,Rank2122
+Huatai Securities,2023,7.0,Rank23
+I-Bankers Securities Inc,2018,4.0,Rank1820
+I-Bankers Securities Inc,2019,4.0,Rank1820
+I-Bankers Securities Inc,2020,4.0,Rank1820
+I-Bankers Securities Inc,2021,4.0,Rank2122
+I-Bankers Securities Inc,2022,4.0,Rank2122
+I-Bankers Securities Inc,2023,4.0,Rank23
+ICBC-Int,2018,8.0,Rank1820
+ICBC-Int,2019,8.0,Rank1820
+ICBC-Int,2020,8.0,Rank1820
+Imperial-Cap,2018,4.0,Rank1820
+Imperial-Cap,2019,4.0,Rank1820
+Imperial-Cap,2020,4.0,Rank1820
+Imperial-Cap,2021,4.0,Rank2122
+Imperial-Cap,2022,4.0,Rank2122
+Imperial-Cap,2023,4.0,Rank23
+Itau BBA,2018,8.0,Rank1820
+Itau BBA,2019,8.0,Rank1820
+Itau BBA,2020,8.0,Rank1820
+Itau BBA,2021,8.0,Rank2122
+Itau BBA,2022,8.0,Rank2122
+JMP-Sec,2018,7.5,Rank1820
+JMP-Sec,2019,7.5,Rank1820
+JMP-Sec,2020,7.5,Rank1820
+JMP-Sec,2021,8.0,Rank2122
+JMP-Sec,2022,8.0,Rank2122
+JMP-Sec,2023,8.0,Rank23
+JMP-Sec,2024,8.0,Rank24
+JP Morgan (JPM),2018,9.0,Rank1820
+JP Morgan (JPM),2019,9.0,Rank1820
+JP Morgan (JPM),2020,9.0,Rank1820
+JP Morgan (JPM),2021,9.0,Rank2122
+JP Morgan (JPM),2022,9.0,Rank2122
+JP Morgan (JPM),2023,9.0,Rank23
+JP Morgan (JPM),2024,9.0,Rank24
+Janney Montgomery Scott Inc,2023,5.0,Rank23
+Jefferies & Co Inc,2018,8.0,Rank1820
+Jefferies & Co Inc,2019,8.0,Rank1820
+Jefferies & Co Inc,2020,8.0,Rank1820
+Jefferies & Co Inc,2021,8.0,Rank2122
+Jefferies & Co Inc,2022,8.0,Rank2122
+Jefferies & Co Inc,2023,8.5,Rank23
+Jefferies & Co Inc,2024,8.5,Rank24
+John Nuveen Co,2018,7.0,Rank1820
+John Nuveen Co,2019,7.0,Rank1820
+John Nuveen Co,2020,7.0,Rank1820
+Jones Trading,2018,4.0,Rank1820
+Jones Trading,2019,4.0,Rank1820
+Jones Trading,2020,4.0,Rank1820
+Jones Trading,2021,4.0,Rank2122
+Jones Trading,2022,4.0,Rank2122
+Jones Trading,2024,3.0,Rank24
+"Joseph Gunnar & Co., LLC",2018,2.0,Rank1820
+"Joseph Gunnar & Co., LLC",2019,2.0,Rank1820
+"Joseph Gunnar & Co., LLC",2020,2.0,Rank1820
+"Joseph Gunnar & Co., LLC",2021,2.0,Rank2122
+"Joseph Gunnar & Co., LLC",2022,2.0,Rank2122
+"Joseph Gunnar & Co., LLC",2024,2.0,Rank24
+Joseph Stone Capital,2021,2.0,Rank2122
+Joseph Stone Capital,2022,2.0,Rank2122
+Joseph Stone Capital,2024,2.0,Rank24
+KKR Capital,2018,8.0,Rank1820
+KKR Capital,2019,8.0,Rank1820
+KKR Capital,2020,8.0,Rank1820
+KKR Capital,2021,8.0,Rank2122
+KKR Capital,2022,8.0,Rank2122
+KKR Capital,2024,8.5,Rank24
+Keefe Bruyette & Woods Inc,2018,7.0,Rank1820
+Keefe Bruyette & Woods Inc,2019,7.0,Rank1820
+Keefe Bruyette & Woods Inc,2020,7.0,Rank1820
+Keefe Bruyette & Woods Inc,2021,7.5,Rank2122
+Keefe Bruyette & Woods Inc,2022,7.5,Rank2122
+Keefe Bruyette & Woods Inc,2023,7.5,Rank23
+Keefe Bruyette & Woods Inc,2024,7.5,Rank24
+Kempen,2021,7.5,Rank2122
+Kempen,2022,7.5,Rank2122
+Kempen,2023,7.5,Rank23
+KeyBanc Capital Markets,2018,6.5,Rank1820
+KeyBanc Capital Markets,2019,6.5,Rank1820
+KeyBanc Capital Markets,2020,6.5,Rank1820
+KeyBanc Capital Markets,2021,7.0,Rank2122
+KeyBanc Capital Markets,2022,7.0,Rank2122
+KeyBanc Capital Markets,2024,7.0,Rank24
+Kingswood,2018,3.0,Rank1820
+Kingswood,2019,3.0,Rank1820
+Kingswood,2020,3.0,Rank1820
+Kingswood,2021,3.0,Rank2122
+Kingswood,2022,3.0,Rank2122
+Kingswood,2024,2.0,Rank24
+Ladenburg Thalmann & Co,2018,6.0,Rank1820
+Ladenburg Thalmann & Co,2019,6.0,Rank1820
+Ladenburg Thalmann & Co,2020,6.0,Rank1820
+Ladenburg Thalmann & Co,2021,6.0,Rank2122
+Ladenburg Thalmann & Co,2022,6.0,Rank2122
+Ladenburg Thalmann & Co,2023,6.0,Rank23
+Ladenburg Thalmann & Co,2024,5.0,Rank24
+Laidlaw & Co (UK),2018,4.0,Rank1820
+Laidlaw & Co (UK),2019,4.0,Rank1820
+Laidlaw & Co (UK),2020,4.0,Rank1820
+Laidlaw & Co (UK),2021,4.0,Rank2122
+Laidlaw & Co (UK),2022,4.0,Rank2122
+Laidlaw & Co (UK),2023,4.0,Rank23
+Laidlaw & Co (UK),2024,4.0,Rank24
+Lake Street Capital Markets,2018,5.0,Rank1820
+Lake Street Capital Markets,2019,5.0,Rank1820
+Lake Street Capital Markets,2020,5.0,Rank1820
+Lake Street Capital Markets,2021,5.0,Rank2122
+Lake Street Capital Markets,2022,5.0,Rank2122
+Lake Street Capital Markets,2023,5.0,Rank23
+Lake Street Capital Markets,2024,5.0,Rank24
+Leerink Partners,2023,7.0,Rank23
+Leerink Partners,2024,7.0,Rank24
+Leerink Swann & Co.,2018,7.0,Rank1820
+Leerink Swann & Co.,2019,7.0,Rank1820
+Leerink Swann & Co.,2020,7.0,Rank1820
+Leerink-SVB,2018,7.0,Rank1820
+Leerink-SVB,2019,7.0,Rank1820
+Leerink-SVB,2020,7.0,Rank1820
+Leerink-SVB,2021,7.5,Rank2122
+Leerink-SVB,2022,7.5,Rank2122
+LifeSci Capital,2018,5.0,Rank1820
+LifeSci Capital,2019,5.0,Rank1820
+LifeSci Capital,2020,5.0,Rank1820
+LifeSci Capital,2021,5.0,Rank2122
+LifeSci Capital,2022,5.0,Rank2122
+Liontree,2021,6.0,Rank2122
+Liontree,2022,6.0,Rank2122
+Loop Capital,2018,5.0,Rank1820
+Loop Capital,2019,5.0,Rank1820
+Loop Capital,2020,5.0,Rank1820
+Loop Capital,2021,5.0,Rank2122
+Loop Capital,2022,5.0,Rank2122
+Loop Capital,2023,5.0,Rank23
+Loop Capital,2024,5.0,Rank24
+Lucid,2024,2.0,Rank24
+MDB-Capital,2018,4.0,Rank1820
+MDB-Capital,2019,4.0,Rank1820
+MDB-Capital,2020,4.0,Rank1820
+MUFG,2024,7.0,Rank24
+Macquarie Bank,2018,7.5,Rank1820
+Macquarie Bank,2019,7.5,Rank1820
+Macquarie Bank,2020,7.5,Rank1820
+Macquarie Bank,2023,7.5,Rank23
+Macquarie Bank,2024,7.5,Rank24
+Maxim Group LLC,2018,3.0,Rank1820
+Maxim Group LLC,2019,3.0,Rank1820
+Maxim Group LLC,2020,3.0,Rank1820
+Maxim Group LLC,2021,3.0,Rank2122
+Maxim Group LLC,2022,3.0,Rank2122
+Maxim Group LLC,2023,3.0,Rank23
+Maxim Group LLC,2024,2.0,Rank24
+Merrill Lynch & Co Inc,2018,8.5,Rank1820
+Merrill Lynch & Co Inc,2019,8.5,Rank1820
+Merrill Lynch & Co Inc,2020,8.5,Rank1820
+Mizuho Securities,2018,7.0,Rank1820
+Mizuho Securities,2019,7.0,Rank1820
+Mizuho Securities,2020,7.0,Rank1820
+Mizuho Securities,2021,7.0,Rank2122
+Mizuho Securities,2022,7.0,Rank2122
+Mizuho Securities,2023,7.5,Rank23
+Moelis,2018,6.0,Rank1820
+Moelis,2019,6.0,Rank1820
+Moelis,2020,6.0,Rank1820
+Morgan Stanley & Co,2018,9.0,Rank1820
+Morgan Stanley & Co,2019,9.0,Rank1820
+Morgan Stanley & Co,2020,9.0,Rank1820
+Morgan Stanley & Co,2021,9.0,Rank2122
+Morgan Stanley & Co,2022,9.0,Rank2122
+Morgan Stanley & Co,2023,9.0,Rank23
+Morgan Stanley & Co,2024,9.0,Rank24
+National Securities Corp,2018,3.0,Rank1820
+National Securities Corp,2019,3.0,Rank1820
+National Securities Corp,2020,3.0,Rank1820
+National Securities Corp,2021,3.0,Rank2122
+National Securities Corp,2022,3.0,Rank2122
+Needham & Co Inc,2018,5.0,Rank1820
+Needham & Co Inc,2019,5.0,Rank1820
+Needham & Co Inc,2020,5.0,Rank1820
+Needham & Co Inc,2021,5.0,Rank2122
+Needham & Co Inc,2022,5.0,Rank2122
+Needham & Co Inc,2023,5.0,Rank23
+Needham & Co Inc,2024,5.0,Rank24
+Network 1 Financial Securities,2018,2.0,Rank1820
+Network 1 Financial Securities,2019,2.0,Rank1820
+Network 1 Financial Securities,2020,2.0,Rank1820
+Network 1 Financial Securities,2021,2.0,Rank2122
+Network 1 Financial Securities,2022,2.0,Rank2122
+Network 1 Financial Securities,2024,2.0,Rank24
+Newbridge Securities,2018,3.0,Rank1820
+Newbridge Securities,2019,3.0,Rank1820
+Newbridge Securities,2020,3.0,Rank1820
+Newbridge Securities,2024,3.0,Rank24
+Nomura Securities,2018,8.0,Rank1820
+Nomura Securities,2019,8.0,Rank1820
+Nomura Securities,2020,8.0,Rank1820
+Nomura Securities,2021,8.0,Rank2122
+Nomura Securities,2022,8.0,Rank2122
+Nomura Securities,2023,8.0,Rank23
+Nomura Securities,2024,8.0,Rank24
+Northland Capital Markets,2018,3.0,Rank1820
+Northland Capital Markets,2019,3.0,Rank1820
+Northland Capital Markets,2020,3.0,Rank1820
+Northland Capital Markets,2021,3.0,Rank2122
+Northland Capital Markets,2022,3.0,Rank2122
+Northland-Sec,2018,3.0,Rank1820
+Northland-Sec,2019,3.0,Rank1820
+Northland-Sec,2020,3.0,Rank1820
+Northland-Sec,2021,3.0,Rank2122
+Northland-Sec,2022,3.0,Rank2122
+Northland-Sec,2024,3.0,Rank24
+Nu Invest,2021,6.0,Rank2122
+Nu Invest,2022,6.0,Rank2122
+Oak Ridge Financial,2018,3.0,Rank1820
+Oak Ridge Financial,2019,3.0,Rank1820
+Oak Ridge Financial,2020,3.0,Rank1820
+Oak Ridge Financial,2021,3.0,Rank2122
+Oak Ridge Financial,2022,3.0,Rank2122
+Odeon Capital Group,2018,6.0,Rank1820
+Odeon Capital Group,2019,6.0,Rank1820
+Odeon Capital Group,2020,6.0,Rank1820
+Odeon Capital Group,2021,6.0,Rank2122
+Odeon Capital Group,2022,6.0,Rank2122
+Odeon Capital Group,2024,6.0,Rank24
+Oppenheimer & Co Inc,2018,7.0,Rank1820
+Oppenheimer & Co Inc,2019,7.0,Rank1820
+Oppenheimer & Co Inc,2020,7.0,Rank1820
+Oppenheimer & Co Inc,2021,7.0,Rank2122
+Oppenheimer & Co Inc,2022,7.0,Rank2122
+Oppenheimer & Co Inc,2023,7.0,Rank23
+Oppenheimer & Co Inc,2024,7.0,Rank24
+PJT Partners,2018,8.0,Rank1820
+PJT Partners,2019,8.0,Rank1820
+PJT Partners,2020,8.0,Rank1820
+PJT Partners,2021,8.0,Rank2122
+PJT Partners,2022,8.0,Rank2122
+PNCPS (SEE Prime Number Capital),2023,4.0,Rank23
+Pacific Century,2021,3.0,Rank2122
+Pacific Century,2022,3.0,Rank2122
+Pacific Century,2023,3.0,Rank23
+Pacific Century,2024,3.0,Rank24
+Paulson Investment Co,2018,3.0,Rank1820
+Paulson Investment Co,2019,3.0,Rank1820
+Paulson Investment Co,2020,3.0,Rank1820
+Paulson Investment Co,2021,3.0,Rank2122
+Paulson Investment Co,2022,3.0,Rank2122
+Paulson Investment Co,2023,3.0,Rank23
+Performance Trust,2021,4.0,Rank2122
+Performance Trust,2022,4.0,Rank2122
+Performance Trust,2023,4.0,Rank23
+Ping An,2018,8.0,Rank1820
+Ping An,2019,8.0,Rank1820
+Ping An,2020,8.0,Rank1820
+Piper Jaffray Inc,2018,7.5,Rank1820
+Piper Jaffray Inc,2019,7.5,Rank1820
+Piper Jaffray Inc,2020,7.5,Rank1820
+Piper-Sandler,2018,7.5,Rank1820
+Piper-Sandler,2019,7.5,Rank1820
+Piper-Sandler,2020,7.5,Rank1820
+Piper-Sandler,2021,7.5,Rank2122
+Piper-Sandler,2022,7.5,Rank2122
+Piper-Sandler,2023,7.5,Rank23
+Piper-Sandler,2024,7.5,Rank24
+Prime Number Capital (PNCPS),2018,7.0,Rank1820
+Prime Number Capital (PNCPS),2019,7.0,Rank1820
+Prime Number Capital (PNCPS),2020,7.0,Rank1820
+Prime Number Capital (PNCPS),2021,5.0,Rank2122
+Prime Number Capital (PNCPS),2022,5.0,Rank2122
+Prime Number Capital (PNCPS),2023,4.0,Rank23
+Prime Number Capital (PNCPS),2024,3.0,Rank24
+R. F. Lafferty,2018,3.0,Rank1820
+R. F. Lafferty,2019,3.0,Rank1820
+R. F. Lafferty,2020,3.0,Rank1820
+R. F. Lafferty,2021,3.0,Rank2122
+R. F. Lafferty,2022,3.0,Rank2122
+R. F. Lafferty,2023,3.0,Rank23
+R. F. Lafferty,2024,3.0,Rank24
+RBC Capital Markets,2018,8.0,Rank1820
+RBC Capital Markets,2019,8.0,Rank1820
+RBC Capital Markets,2020,8.0,Rank1820
+RBC Capital Markets,2021,8.0,Rank2122
+RBC Capital Markets,2022,8.0,Rank2122
+RBC Capital Markets,2023,8.0,Rank23
+RBC Capital Markets,2024,8.0,Rank24
+Rabo Securities,2021,7.5,Rank2122
+Rabo Securities,2022,7.5,Rank2122
+Raymond James & Associates Inc,2018,7.5,Rank1820
+Raymond James & Associates Inc,2019,7.5,Rank1820
+Raymond James & Associates Inc,2020,7.5,Rank1820
+Raymond James & Associates Inc,2021,7.5,Rank2122
+Raymond James & Associates Inc,2022,7.5,Rank2122
+Raymond James & Associates Inc,2023,7.5,Rank23
+Raymond James & Associates Inc,2024,7.5,Rank24
+Revere Securities,2021,3.0,Rank2122
+Revere Securities,2022,3.0,Rank2122
+Revere Securities,2023,3.0,Rank23
+Revere Securities,2024,2.0,Rank24
+Robert W Baird & Co Inc,2018,7.0,Rank1820
+Robert W Baird & Co Inc,2019,7.0,Rank1820
+Robert W Baird & Co Inc,2020,7.0,Rank1820
+Robert W Baird & Co Inc,2021,7.0,Rank2122
+Robert W Baird & Co Inc,2022,7.0,Rank2122
+Robert W Baird & Co Inc,2023,7.0,Rank23
+Robert W Baird & Co Inc,2024,7.0,Rank24
+Rosenblatt Securities,2024,3.0,Rank24
+Roth Capital Partners Inc,2018,5.0,Rank1820
+Roth Capital Partners Inc,2019,5.0,Rank1820
+Roth Capital Partners Inc,2020,5.0,Rank1820
+Roth Capital Partners Inc,2021,4.0,Rank2122
+Roth Capital Partners Inc,2022,4.0,Rank2122
+Roth Capital Partners Inc,2023,4.0,Rank23
+Roth Capital Partners Inc,2024,4.0,Rank24
+SMBC Nikko,2021,7.0,Rank2122
+SMBC Nikko,2022,7.0,Rank2122
+SPAC Advisory (division of Kingswood),2024,2.0,Rank24
+SVB-Leerink,2018,7.0,Rank1820
+SVB-Leerink,2019,7.0,Rank1820
+SVB-Leerink,2020,7.0,Rank1820
+SVB-Leerink,2021,7.5,Rank2122
+SVB-Leerink,2022,7.5,Rank2122
+Sandler O'Neill Partners,2018,7.5,Rank1820
+Sandler O'Neill Partners,2019,7.5,Rank1820
+Sandler O'Neill Partners,2020,7.5,Rank1820
+Santander Investment Bank,2018,8.0,Rank1820
+Santander Investment Bank,2019,8.0,Rank1820
+Santander Investment Bank,2020,8.0,Rank1820
+Santander Investment Bank,2021,8.0,Rank2122
+Santander Investment Bank,2022,8.0,Rank2122
+Santander Investment Bank,2023,8.0,Rank23
+Santander Investment Bank,2024,7.5,Rank24
+Scotia Capital Inc,2018,7.0,Rank1820
+Scotia Capital Inc,2019,7.0,Rank1820
+Scotia Capital Inc,2020,7.0,Rank1820
+Scotia Capital Inc,2021,7.0,Rank2122
+Scotia Capital Inc,2022,7.0,Rank2122
+Seaport Global Securities,2021,3.0,Rank2122
+Seaport Global Securities,2022,3.0,Rank2122
+Seaport Global Securities,2023,3.0,Rank23
+Seaport Global Securities,2024,3.0,Rank24
+SoFi Securities,2021,6.5,Rank2122
+SoFi Securities,2022,6.5,Rank2122
+Societe Generale,2018,7.5,Rank1820
+Societe Generale,2019,7.5,Rank1820
+Societe Generale,2020,7.5,Rank1820
+Societe Generale,2021,7.5,Rank2122
+Societe Generale,2022,7.5,Rank2122
+Societe Generale,2023,7.5,Rank23
+Societe Generale,2024,7.5,Rank24
+Spartan Group (Spartan Capital),2018,3.0,Rank1820
+Spartan Group (Spartan Capital),2019,3.0,Rank1820
+Spartan Group (Spartan Capital),2020,3.0,Rank1820
+Spartan Group (Spartan Capital),2021,3.0,Rank2122
+Spartan Group (Spartan Capital),2022,3.0,Rank2122
+Spartan Group (Spartan Capital),2024,2.0,Rank24
+Stephens Inc,2018,7.0,Rank1820
+Stephens Inc,2019,7.0,Rank1820
+Stephens Inc,2020,7.0,Rank1820
+Stephens Inc,2021,7.0,Rank2122
+Stephens Inc,2022,7.0,Rank2122
+Stifel,2018,7.0,Rank1820
+Stifel,2019,7.0,Rank1820
+Stifel,2020,7.0,Rank1820
+Stifel,2021,7.5,Rank2122
+Stifel,2022,7.5,Rank2122
+Stifel,2023,7.5,Rank23
+Stifel,2024,7.5,Rank24
+Stifel Nicolaus & Co Inc,2018,7.0,Rank1820
+Stifel Nicolaus & Co Inc,2019,7.0,Rank1820
+Stifel Nicolaus & Co Inc,2020,7.0,Rank1820
+Stifel Nicolaus Weisel,2018,7.0,Rank1820
+Stifel Nicolaus Weisel,2019,7.0,Rank1820
+Stifel Nicolaus Weisel,2020,7.0,Rank1820
+SunTrust Robinson Humphrey,2018,7.0,Rank1820
+SunTrust Robinson Humphrey,2019,7.0,Rank1820
+SunTrust Robinson Humphrey,2020,7.0,Rank1820
+SunTrust Robinson Humphrey,2021,7.0,Rank2122
+SunTrust Robinson Humphrey,2022,7.0,Rank2122
+TD Cowen,2023,7.5,Rank23
+TD Cowen,2024,7.5,Rank24
+TD Securities Inc,2018,7.0,Rank1820
+TD Securities Inc,2019,7.0,Rank1820
+TD Securities Inc,2020,7.0,Rank1820
+TD Securities Inc,2021,7.0,Rank2122
+TD Securities Inc,2022,7.0,Rank2122
+TD Securities Inc,2023,7.0,Rank23
+TD Securities Inc,2024,7.5,Rank24
+TPG Capital,2018,8.0,Rank1820
+TPG Capital,2019,8.0,Rank1820
+TPG Capital,2020,8.0,Rank1820
+TPG Capital,2021,8.0,Rank2122
+TPG Capital,2022,8.0,Rank2122
+TPG Capital,2023,8.0,Rank23
+TPG Capital,2024,8.0,Rank24
+The Benchmark Company,2018,4.0,Rank1820
+The Benchmark Company,2019,4.0,Rank1820
+The Benchmark Company,2020,4.0,Rank1820
+The Benchmark Company,2021,3.0,Rank2122
+The Benchmark Company,2022,3.0,Rank2122
+The Benchmark Company,2023,3.0,Rank23
+The Benchmark Company,2024,2.0,Rank24
+Thinkequity Partners LLC,2018,5.0,Rank1820
+Thinkequity Partners LLC,2019,5.0,Rank1820
+Thinkequity Partners LLC,2020,5.0,Rank1820
+Thinkequity Partners LLC,2021,5.0,Rank2122
+Thinkequity Partners LLC,2022,5.0,Rank2122
+Thinkequity Partners LLC,2023,4.0,Rank23
+Thinkequity Partners LLC,2024,4.0,Rank24
+Tiger Brokers (NZ),2018,7.0,Rank1820
+Tiger Brokers (NZ),2019,7.0,Rank1820
+Tiger Brokers (NZ),2020,7.0,Rank1820
+Tiger Brokers (NZ),2021,6.0,Rank2122
+Tiger Brokers (NZ),2022,6.0,Rank2122
+Tiger Brokers (NZ),2023,4.0,Rank23
+Tiger Brokers (NZ),2024,4.0,Rank24
+Titan,2023,3.0,Rank23
+Titan,2024,3.0,Rank24
+Truist Securities,2018,6.0,Rank1820
+Truist Securities,2019,6.0,Rank1820
+Truist Securities,2020,6.0,Rank1820
+Truist Securities,2021,7.0,Rank2122
+Truist Securities,2022,7.0,Rank2122
+Truist Securities,2023,7.5,Rank23
+Truist Securities,2024,7.5,Rank24
+Tudor-Pickering,2018,5.0,Rank1820
+Tudor-Pickering,2019,5.0,Rank1820
+Tudor-Pickering,2020,5.0,Rank1820
+Tudor-Pickering,2021,5.0,Rank2122
+Tudor-Pickering,2022,5.0,Rank2122
+UBS Investment Bank,2018,8.5,Rank1820
+UBS Investment Bank,2019,8.5,Rank1820
+UBS Investment Bank,2020,8.5,Rank1820
+UBS Investment Bank,2021,8.0,Rank2122
+UBS Investment Bank,2022,8.0,Rank2122
+UBS Investment Bank,2023,8.0,Rank23
+UBS Investment Bank,2024,8.0,Rank24
+US Tiger,2021,4.0,Rank2122
+US Tiger,2022,4.0,Rank2122
+US Tiger,2023,4.0,Rank23
+US Tiger,2024,3.0,Rank24
+Univest Securities,2018,4.0,Rank1820
+Univest Securities,2019,4.0,Rank1820
+Univest Securities,2020,4.0,Rank1820
+Univest Securities,2021,4.0,Rank2122
+Univest Securities,2022,4.0,Rank2122
+Univest Securities,2023,3.0,Rank23
+VIEWT-SEC,2018,3.0,Rank1820
+VIEWT-SEC,2019,3.0,Rank1820
+VIEWT-SEC,2020,3.0,Rank1820
+VIEWT-SEC,2021,3.0,Rank2122
+VIEWT-SEC,2022,3.0,Rank2122
+VIEWT-SEC,2023,3.0,Rank23
+Valuable Capital,2018,4.0,Rank1820
+Valuable Capital,2019,4.0,Rank1820
+Valuable Capital,2020,4.0,Rank1820
+Valuable Capital,2021,4.0,Rank2122
+Valuable Capital,2022,4.0,Rank2122
+Valuable Capital,2023,4.0,Rank23
+Valuable Capital,2024,4.0,Rank24
+WallachBeth Capital,2018,2.0,Rank1820
+WallachBeth Capital,2019,2.0,Rank1820
+WallachBeth Capital,2020,2.0,Rank1820
+WallachBeth Capital,2021,2.0,Rank2122
+WallachBeth Capital,2022,2.0,Rank2122
+WallachBeth Capital,2023,2.0,Rank23
+WallachBeth Capital,2024,2.0,Rank24
+Webull Financial,2023,4.0,Rank23
+Wedbush Morgan Securities,2018,6.5,Rank1820
+Wedbush Morgan Securities,2019,6.5,Rank1820
+Wedbush Morgan Securities,2020,6.5,Rank1820
+Wedbush Morgan Securities,2021,6.5,Rank2122
+Wedbush Morgan Securities,2022,6.5,Rank2122
+Wells Fargo,2018,8.0,Rank1820
+Wells Fargo,2019,8.0,Rank1820
+Wells Fargo,2020,8.0,Rank1820
+Wells Fargo,2021,8.0,Rank2122
+Wells Fargo,2022,8.0,Rank2122
+Wells Fargo,2023,8.0,Rank23
+Wells Fargo,2024,8.0,Rank24
+Werbel-Roth Securities,2024,4.0,Rank24
+West Park Capital,2021,2.0,Rank2122
+West Park Capital,2022,2.0,Rank2122
+West Park Capital,2023,2.0,Rank23
+West Park Capital,2024,2.0,Rank24
+William Blair & Co,2018,7.0,Rank1820
+William Blair & Co,2019,7.0,Rank1820
+William Blair & Co,2020,7.0,Rank1820
+William Blair & Co,2021,7.0,Rank2122
+William Blair & Co,2022,7.0,Rank2122
+William Blair & Co,2023,7.0,Rank23
+William Blair & Co,2024,7.0,Rank24
+Wilson-Davis,2024,3.0,Rank24
+ZXP Investimentos,2021,6.0,Rank2122
+ZXP Investimentos,2022,6.0,Rank2122
