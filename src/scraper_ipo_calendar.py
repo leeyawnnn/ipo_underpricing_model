@@ -1,9 +1,27 @@
 """
-IPO calendar scraper — stockanalysis.com.
+IPO calendar scraper - stockanalysis.com.
 
-Fetches IPO records (ticker, name, date, offer price, offer size, exchange,
-sector, lead underwriter) for the years 2019–2024 and persists the results
-to ``data/raw/ipo_calendar.csv``.
+Fetches the ticker, company name, listing date and offer price for US IPOs in
+2019-2024 and persists them to ``data/raw/ipo_calendar.csv``.
+
+**What this source does not provide.** The year pages carry the columns
+``[IPO Date, Symbol, Company Name, IPO Price, Current, Return]``. ``Return``
+runs from the offer price to the price *on the day the page was fetched*, not
+to the first-day close. An earlier version of this scraper mapped it to
+``first_day_return_pct`` and the whole project was built on it; Palantir was
+recorded as +1873.66% underpriced against a true first-day return of +31.03%.
+It is now named ``return_to_scrape_date`` and nothing downstream reads it.
+The first-day close comes from :mod:`src.scraper_prices` instead.
+
+The pages also carry no shares offered, no proceeds and no underwriter. Deal
+size and the syndicate are recovered from the prospectus cover page in
+:mod:`src.feature_engineering` and :mod:`src.underwriters`.
+
+**Conduct.** https://stockanalysis.com/robots.txt disallows only /e/ and /p/,
+not /ipos/. Requests are throttled to 2 per second and year pages are cached
+on disk so a re-run costs no traffic. Their terms permit snippets with
+attribution but not republishing content in full, so the scrape is not
+committed to this repository.
 
 Usage (CLI)::
 
@@ -141,8 +159,10 @@ _COLUMN_MAP = {
     "Shares Offered": "shares_offered",
     "$ Raised": "offer_size_m",
     "Amount Raised ($M)": "offer_size_m",
-    "Return": "first_day_return_pct",
-    "1st Day Return": "first_day_return_pct",
+    # NOT the first-day return: this is the return to the date the page was
+    # fetched. Named so that it cannot be mistaken for the target again.
+    "Return": "return_to_scrape_date",
+    "Current": "price_at_scrape_date",
     "Exchange": "exchange",
     "Underwriter": "lead_underwriter",
     "Lead Underwriter": "lead_underwriter",
@@ -163,7 +183,7 @@ def _normalise(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns={k: v for k, v in _COLUMN_MAP.items() if k in df.columns})
 
     # Coerce numeric columns
-    for col in ("offer_price", "shares_offered", "offer_size_m", "first_day_return_pct"):
+    for col in ("offer_price", "shares_offered", "offer_size_m", "return_to_scrape_date"):
         if col in df.columns:
             df[col] = (
                 df[col]
