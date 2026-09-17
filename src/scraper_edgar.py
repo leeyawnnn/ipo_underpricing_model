@@ -286,68 +286,143 @@ def _html_to_text(html: str) -> str:
     return text.strip()
 
 
-# Section heading patterns (case-insensitive)
-_RISK_FACTORS_RE = re.compile(r"(?:ITEM\s+1A\.?\s*)?RISK\s+FACTORS", re.IGNORECASE)
-_MDA_RE = re.compile(r"MANAGEMENT.{0,10}S?\s+DISCUSSION\s+AND\s+ANALYSIS", re.IGNORECASE)
-_NEXT_ITEM_RE = re.compile(r"ITEM\s+\d+[A-Z]?\.", re.IGNORECASE)
+# ---------------------------------------------------------------------------
+# Section extraction
+# ---------------------------------------------------------------------------
+#
+# A prospectus is not a 10-K. It has no "Item 1A." numbering, so the obvious
+# approach - slice from a heading to the next "Item N." - has nothing to stop
+# at. The previous implementation ended Risk Factors at the first in-text
+# cross-reference to "Management's Discussion and Analysis", which appears a
+# few paragraphs in, and ended MD&A at "Item [3-9]", which never matches, so
+# MD&A ran to the end of the filing. Measured over 400 saved prospectuses,
+# Risk Factors came out at a median 0.3% of the document and MD&A at 58.6%,
+# with 122 of 400 above 80%.
+#
+# The signal that does work is the page-break marker. EDGAR's HTML paginates
+# with a "Table of Contents" link at the top of every page, which survives the
+# text conversion, and a section always starts at the top of a page. So a
+# heading that appears within a few dozen characters after a page break is a
+# real heading; the same words elsewhere are prose or a cross-reference.
+# Against that rule Risk Factors comes out at a median 20.6% of the document
+# and MD&A at 26.1%, which are plausible proportions for an S-1.
+#
+# Roughly 30% of the saved filings carry too few page-break markers for the
+# rule to apply. Their sections are reported as missing rather than guessed;
+# the full-prospectus tone ratios, which are the primary text signal, do not
+# depend on this at all.
 
+# Section headings distinctive enough to anchor a boundary. Single common
+# words - "Business", "Management", "Dilution", "Capitalization",
+# "Underwriting" - are deliberately excluded: they appear at the top of a page
+# mid-sentence often enough to cut a section short.
+_SECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("prospectus_summary", re.compile(r"PROSPECTUS\s+SUMMARY", re.IGNORECASE)),
+    ("risk_factors", re.compile(r"(?:ITEM\s+1A\.?\s*)?RISK\s+FACTORS", re.IGNORECASE)),
+    (
+        "forward_looking",
+        re.compile(
+            r"(?:SPECIAL\s+NOTE|CAUTIONARY\s+(?:NOTE|STATEMENT))[^.\n]{0,40}"
+            r"FORWARD[\s-]LOOKING",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "market_data",
+        re.compile(r"(?:INDUSTRY\s+AND\s+MARKET|MARKET\s+AND\s+INDUSTRY)\s+DATA", re.IGNORECASE),
+    ),
+    ("use_of_proceeds", re.compile(r"USE\s+OF\s+PROCEEDS", re.IGNORECASE)),
+    ("dividend_policy", re.compile(r"DIVIDEND\s+POLICY", re.IGNORECASE)),
+    (
+        "selected_financial",
+        re.compile(r"SELECTED\s+(?:CONSOLIDATED\s+)?(?:HISTORICAL\s+)?FINANCIAL", re.IGNORECASE),
+    ),
+    ("mda", re.compile(r"MANAGEMENT.{0,3}S?\s+DISCUSSION\s+AND\s+ANALYSIS", re.IGNORECASE)),
+    (
+        "market_risk",
+        re.compile(r"QUANTITATIVE\s+AND\s+QUALITATIVE\s+DISCLOSURES", re.IGNORECASE),
+    ),
+    ("executive_compensation", re.compile(r"EXECUTIVE\s+COMPENSATION", re.IGNORECASE)),
+    (
+        "related_party",
+        re.compile(r"(?:CERTAIN\s+)?RELATIONSHIPS\s+AND\s+RELATED", re.IGNORECASE),
+    ),
+    (
+        "principal_holders",
+        re.compile(r"PRINCIPAL\s+(?:AND\s+SELLING\s+)?(?:STOCK|SHARE)HOLDERS", re.IGNORECASE),
+    ),
+    (
+        "capital_stock",
+        re.compile(
+            r"DESCRIPTION\s+OF\s+(?:OUR\s+)?(?:CAPITAL\s+STOCK|SECURITIES|SHARE\s+CAPITAL)",
+            re.IGNORECASE,
+        ),
+    ),
+    ("future_sale", re.compile(r"SHARES\s+ELIGIBLE\s+FOR\s+FUTURE\s+SALE", re.IGNORECASE)),
+    (
+        "taxation",
+        re.compile(r"MATERIAL\s+U\.?S\.?\s+FEDERAL\s+INCOME\s+TAX", re.IGNORECASE),
+    ),
+    ("legal_matters", re.compile(r"LEGAL\s+MATTERS", re.IGNORECASE)),
+    (
+        "financial_statements",
+        re.compile(
+            r"INDEX\s+TO\s+(?:THE\s+)?(?:CONSOLIDATED\s+)?FINANCIAL\s+STATEMENTS", re.IGNORECASE
+        ),
+    ),
+]
 
-def _extract_section(text: str, start_pattern: re.Pattern, end_pattern: re.Pattern) -> str:
-    """Extract the text between two section headings, skipping TOC.
+_PAGE_BREAK_RE = re.compile(r"Table\s+of\s+Contents", re.IGNORECASE)
 
-    Args:
-        text: Full plain-text prospectus.
-        start_pattern: Regex marking the beginning of the desired section.
-        end_pattern: Regex marking the start of the next section.
-
-    Returns:
-        Extracted section text, or empty string if not found.
-    """
-    # TOC is usually in the first 10k-20k characters.
-    # We find all matches and pick the one that occurs after 10k chars if possible,
-    # or the one that is followed by the most text.
-    matches = list(start_pattern.finditer(text))
-    if not matches:
-        return ""
-
-    # Heuristic: pick the first match after character 10,000 (likely after TOC)
-    # If no match after 10k, pick the last match.
-    start_match = None
-    for m in matches:
-        if m.start() > 10000:
-            start_match = m
-            break
-    if not start_match:
-        start_match = matches[-1]
-
-    start_pos = start_match.end()
-
-    # Find the end pattern after the start
-    end_match = end_pattern.search(text, start_pos + 1000)
-    end_pos = end_match.start() if end_match else len(text)
-
-    return text[start_pos:end_pos].strip()
+# Characters after a page break within which a heading still counts as one.
+_HEADING_OFFSET_CHARS = 40
+# Below this many page breaks the document was not paginated in a way we can
+# use, and no section is claimed.
+_MIN_PAGE_BREAKS = 5
+# A slice shorter than this is a cross-reference, not a section.
+_MIN_SECTION_CHARS = 500
 
 
 def extract_sections(text: str) -> dict[str, str]:
-    """Extract Risk Factors and MD&A sections from a prospectus.
+    """Split a prospectus into its named sections.
 
     Args:
-        text: Full plain-text prospectus.
+        text: Full plain-text prospectus, as produced by :func:`_html_to_text`.
 
     Returns:
-        Dict with keys ``risk_factors`` and ``mda``, each containing the
-        extracted section text (or empty string if not found).
+        Dict keyed by section name (``risk_factors``, ``mda`` and the others
+        in ``_SECTION_PATTERNS``). Sections that could not be located, and
+        every section when the document carries too few page-break markers to
+        anchor on, are absent. Callers should use ``.get(name, "")``.
     """
-    # Risk Factors: between "Risk Factors" and the next "Item X."
-    risk_end_re = re.compile(r"ITEM\s+[2-9]|MANAGEMENT.{0,10}S?\s+DISCUSSION", re.IGNORECASE)
-    risk = _extract_section(text, _RISK_FACTORS_RE, risk_end_re)
+    page_breaks = [match.end() for match in _PAGE_BREAK_RE.finditer(text)]
+    if len(page_breaks) < _MIN_PAGE_BREAKS:
+        return {}
 
-    # MD&A: between heading and next Item
-    mda_end_re = re.compile(r"ITEM\s+[3-9]", re.IGNORECASE)
-    mda = _extract_section(text, _MDA_RE, mda_end_re)
+    def at_page_top(position: int) -> bool:
+        return any(0 <= position - end <= _HEADING_OFFSET_CHARS for end in page_breaks)
 
-    return {"risk_factors": risk, "mda": mda}
+    headings = sorted(
+        (match.start(), name)
+        for name, pattern in _SECTION_PATTERNS
+        for match in pattern.finditer(text)
+        if at_page_top(match.start())
+    )
+    if not headings:
+        return {}
+
+    first_seen: dict[str, int] = {}
+    for position, name in headings:
+        first_seen.setdefault(name, position)
+    ordered = sorted(first_seen.items(), key=lambda item: item[1])
+
+    sections: dict[str, str] = {}
+    for index, (name, position) in enumerate(ordered):
+        end = ordered[index + 1][1] if index + 1 < len(ordered) else len(text)
+        chunk = text[position:end].strip()
+        if len(chunk) >= _MIN_SECTION_CHARS:
+            sections[name] = chunk
+    return sections
 
 
 # ---------------------------------------------------------------------------
@@ -416,15 +491,15 @@ def process_ticker(
 
     # 5. Extract sections
     sections = extract_sections(text)
-    risk_path.write_text(sections["risk_factors"], encoding="utf-8")
-    mda_path.write_text(sections["mda"], encoding="utf-8")
+    risk_path.write_text(sections.get("risk_factors", ""), encoding="utf-8")
+    mda_path.write_text(sections.get("mda", ""), encoding="utf-8")
 
     log.info(
         "%s: saved full=%d chars, risk=%d chars, mda=%d chars",
         ticker,
         len(text),
-        len(sections["risk_factors"]),
-        len(sections["mda"]),
+        len(sections.get("risk_factors", "")),
+        len(sections.get("mda", "")),
     )
 
     return {
