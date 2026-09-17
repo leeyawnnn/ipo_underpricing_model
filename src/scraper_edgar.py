@@ -28,7 +28,6 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import requests
@@ -47,6 +46,7 @@ S1_DIR = RAW_DIR / "s1_filings"
 CACHE_DIR = RAW_DIR / ".cache"
 IPO_CSV = RAW_DIR / "ipo_calendar.csv"
 
+
 def _user_agent() -> str:
     """Return the SEC fair-access User-Agent, from the environment.
 
@@ -63,7 +63,7 @@ def _user_agent() -> str:
     if not value or "@" not in value:
         raise RuntimeError(
             "SEC_EDGAR_USER_AGENT is not set to a contactable address.\n"
-            'Set it, for example:\n'
+            "Set it, for example:\n"
             '  export SEC_EDGAR_USER_AGENT="Jane Doe jane@example.com"'
         )
     return value
@@ -99,8 +99,12 @@ def _ensure_user_agent() -> None:
         SESSION.headers["User-Agent"] = _user_agent()
 
 
-@retry(max_attempts=6, backoff_factor=2.5, initial_wait=1.5,
-       exceptions=(requests.RequestException, OSError))
+@retry(
+    max_attempts=6,
+    backoff_factor=2.5,
+    initial_wait=1.5,
+    exceptions=(requests.RequestException, OSError),
+)
 @throttle(calls_per_second=8.0)
 def _get(url: str, **kwargs) -> requests.Response:
     """GET *url* with retry/throttle applied.
@@ -130,7 +134,8 @@ def _get(url: str, **kwargs) -> requests.Response:
 # CIK lookup
 # ---------------------------------------------------------------------------
 
-def lookup_cik(ticker: str) -> Optional[str]:
+
+def lookup_cik(ticker: str) -> str | None:
     """Look up the SEC CIK number for a given ticker.
 
     Uses the EDGAR company-facts tickers.json mapping, which maps ticker
@@ -166,7 +171,8 @@ def lookup_cik(ticker: str) -> Optional[str]:
 # Filing search
 # ---------------------------------------------------------------------------
 
-def find_s1_filing(cik: str, before_date: str) -> Optional[dict]:
+
+def find_s1_filing(cik: str, before_date: str) -> dict | None:
     """Find the most recent S-1 or S-1/A filing for a company before a date.
 
     Args:
@@ -217,6 +223,7 @@ def find_s1_filing(cik: str, before_date: str) -> Optional[dict]:
 # Document download and text extraction
 # ---------------------------------------------------------------------------
 
+
 def _build_filing_url(cik: str, accession_number: str, primary_doc: str) -> str:
     """Construct the direct URL to a filing's primary HTML document.
 
@@ -230,10 +237,7 @@ def _build_filing_url(cik: str, accession_number: str, primary_doc: str) -> str:
         Full EDGAR archives URL.
     """
     acc_nodash = accession_number.replace("-", "")
-    return (
-        f"https://www.sec.gov/Archives/edgar/data/"
-        f"{int(cik)}/{acc_nodash}/{primary_doc}"
-    )
+    return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_nodash}/{primary_doc}"
 
 
 def _html_to_text(html: str) -> str:
@@ -256,15 +260,9 @@ def _html_to_text(html: str) -> str:
 
 
 # Section heading patterns (case-insensitive)
-_RISK_FACTORS_RE = re.compile(
-    r"(?:ITEM\s+1A\.?\s*)?RISK\s+FACTORS", re.IGNORECASE
-)
-_MDA_RE = re.compile(
-    r"MANAGEMENT.{0,10}S?\s+DISCUSSION\s+AND\s+ANALYSIS", re.IGNORECASE
-)
-_NEXT_ITEM_RE = re.compile(
-    r"ITEM\s+\d+[A-Z]?\.", re.IGNORECASE
-)
+_RISK_FACTORS_RE = re.compile(r"(?:ITEM\s+1A\.?\s*)?RISK\s+FACTORS", re.IGNORECASE)
+_MDA_RE = re.compile(r"MANAGEMENT.{0,10}S?\s+DISCUSSION\s+AND\s+ANALYSIS", re.IGNORECASE)
+_NEXT_ITEM_RE = re.compile(r"ITEM\s+\d+[A-Z]?\.", re.IGNORECASE)
 
 
 def _extract_section(text: str, start_pattern: re.Pattern, end_pattern: re.Pattern) -> str:
@@ -315,9 +313,7 @@ def extract_sections(text: str) -> dict[str, str]:
         extracted section text (or empty string if not found).
     """
     # Risk Factors: between "Risk Factors" and the next "Item X."
-    risk_end_re = re.compile(
-        r"ITEM\s+[2-9]|MANAGEMENT.{0,10}S?\s+DISCUSSION", re.IGNORECASE
-    )
+    risk_end_re = re.compile(r"ITEM\s+[2-9]|MANAGEMENT.{0,10}S?\s+DISCUSSION", re.IGNORECASE)
     risk = _extract_section(text, _RISK_FACTORS_RE, risk_end_re)
 
     # MD&A: between heading and next Item
@@ -330,6 +326,7 @@ def extract_sections(text: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Per-ticker pipeline
 # ---------------------------------------------------------------------------
+
 
 def process_ticker(
     ticker: str,
@@ -419,9 +416,10 @@ def process_ticker(
 # Batch runner
 # ---------------------------------------------------------------------------
 
+
 def run_edgar_scraper(
     ipo_csv: Path = IPO_CSV,
-    max_tickers: Optional[int] = None,
+    max_tickers: int | None = None,
 ) -> pd.DataFrame:
     """Scrape S-1 filings for all tickers in the IPO calendar CSV.
 

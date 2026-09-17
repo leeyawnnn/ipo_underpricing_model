@@ -40,7 +40,6 @@ from __future__ import annotations
 import time
 import warnings
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -76,6 +75,7 @@ SPLIT_PROBE_DAYS = 5
 # ---------------------------------------------------------------------------
 # Split handling
 # ---------------------------------------------------------------------------
+
 
 def split_is_applied(
     closes: pd.Series,
@@ -187,6 +187,7 @@ def _naive_index(frame: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
 # Per-ticker fetch
 # ---------------------------------------------------------------------------
 
+
 def fetch_first_day_prices(
     ticker: str,
     ipo_date: pd.Timestamp,
@@ -281,6 +282,7 @@ def fetch_first_day_prices(
 # Market index downloads (VIX + NASDAQ)
 # ---------------------------------------------------------------------------
 
+
 def download_market_indices(
     start: str = "2018-10-01",
     end: str = "2025-03-31",
@@ -319,10 +321,11 @@ def download_market_indices(
 # Batch runner
 # ---------------------------------------------------------------------------
 
+
 def run_price_scraper(
     ipo_csv: Path = IPO_CSV,
     output_csv: Path = OUTPUT_CSV,
-    max_tickers: Optional[int] = None,
+    max_tickers: int | None = None,
     sleep_between: float = 0.15,
 ) -> pd.DataFrame:
     """Collect first-day prices for every ticker in the IPO calendar.
@@ -363,7 +366,9 @@ def run_price_scraper(
     prices.to_csv(output_csv, index=False)
     log.info(
         "Price collection complete: %d / %d ok → %s",
-        (prices["status"] == "ok").sum(), len(prices), output_csv,
+        (prices["status"] == "ok").sum(),
+        len(prices),
+        output_csv,
     )
     return prices
 

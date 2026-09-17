@@ -52,6 +52,7 @@ CALENDAR_COLUMNS = ["ipo_date", "ticker", "company_name", "offer_price"]
 # Market regime, lagged
 # ---------------------------------------------------------------------------
 
+
 def load_market(path: Path = MARKET_PATH) -> pd.DataFrame:
     """Load daily VIX and NASDAQ closes with derived rolling statistics.
 
@@ -155,6 +156,7 @@ def expanding_hot_market(
 # Assembly
 # ---------------------------------------------------------------------------
 
+
 def load_calendar(path: Path = CALENDAR_PATH) -> pd.DataFrame:
     """Load and de-duplicate the IPO calendar."""
     calendar = pd.read_csv(path, parse_dates=["ipo_date"])
@@ -213,13 +215,21 @@ def assemble(
     prices["ticker"] = prices["ticker"].astype(str).str.upper()
     prices["ipo_date"] = pd.to_datetime(prices["ipo_date"])
     keep = [
-        "ticker", "ipo_date", "first_trade_date", "first_day_open", "first_day_close",
-        "split_factor", "underpricing", "first_week_return", "first_month_return",
+        "ticker",
+        "ipo_date",
+        "first_trade_date",
+        "first_day_open",
+        "first_day_close",
+        "split_factor",
+        "underpricing",
+        "first_week_return",
+        "first_month_return",
         "status",
     ]
     prices = prices[[c for c in keep if c in prices.columns]]
-    df = df.merge(prices.rename(columns={"status": "price_status"}),
-                  on=["ticker", "ipo_date"], how="left")
+    df = df.merge(
+        prices.rename(columns={"status": "price_status"}), on=["ticker", "ipo_date"], how="left"
+    )
 
     sic = pd.read_csv(sic_path, dtype={"sic": "string", "cik": "string"})
     sic["ticker"] = sic["ticker"].astype(str).str.upper()
@@ -228,7 +238,8 @@ def assemble(
     sic["sector"] = sic["sic"].map(sector_for_sic)
     df = df.merge(
         sic[["ticker", "cik", "sic", "sic_description", "sector"]].drop_duplicates("ticker"),
-        on="ticker", how="left",
+        on="ticker",
+        how="left",
     )
     df["sector"] = df["sector"].fillna(UNCLASSIFIED)
     # SIC 6770 is the SEC's own code for a blank-cheque company.
@@ -254,6 +265,7 @@ def assemble(
 # ---------------------------------------------------------------------------
 # Funnel
 # ---------------------------------------------------------------------------
+
 
 def sample_funnel(df: pd.DataFrame) -> pd.DataFrame:
     """Count what survives each requirement, in the order they are applied.
@@ -333,9 +345,17 @@ def selection_comparison(df: pd.DataFrame, flag: str = "has_filing") -> pd.DataF
         a = pd.to_numeric(included[column], errors="coerce").dropna()
         b = pd.to_numeric(excluded[column], errors="coerce").dropna()
         if len(a) < 2 or len(b) < 2:
-            rows.append({"observable": label, "in_sample": np.nan, "out_of_sample": np.nan,
-                         "difference": np.nan, "p_value": np.nan,
-                         "n_in": len(a), "n_out": len(b)})
+            rows.append(
+                {
+                    "observable": label,
+                    "in_sample": np.nan,
+                    "out_of_sample": np.nan,
+                    "difference": np.nan,
+                    "p_value": np.nan,
+                    "n_in": len(a),
+                    "n_out": len(b),
+                }
+            )
             continue
         test = stats.ttest_ind(a, b, equal_var=False)
         rows.append(

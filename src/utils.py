@@ -13,13 +13,14 @@ import hashlib
 import logging
 import pickle
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Tuple, Type
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
+
 
 def setup_logging(
     name: str,
@@ -49,11 +50,12 @@ def setup_logging(
 # Retry decorator
 # ---------------------------------------------------------------------------
 
+
 def retry(
     max_attempts: int = 5,
     backoff_factor: float = 2.0,
     initial_wait: float = 1.0,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> Callable:
     """Decorator that retries a function with exponential backoff on failure.
 
@@ -109,6 +111,7 @@ def retry(
 # ---------------------------------------------------------------------------
 # Disk cache
 # ---------------------------------------------------------------------------
+
 
 def disk_cache(cache_dir: Path, ignore_args: bool = False) -> Callable:
     """Decorator that persists function results to disk using pickle.
@@ -168,6 +171,7 @@ def disk_cache(cache_dir: Path, ignore_args: bool = False) -> Callable:
 # ---------------------------------------------------------------------------
 # Misc helpers
 # ---------------------------------------------------------------------------
+
 
 def throttle(calls_per_second: float = 10.0) -> Callable:
     """Decorator that rate-limits a function to ``calls_per_second``.

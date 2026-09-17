@@ -14,10 +14,10 @@ from src.feature_engineering import (
     filed_shares_offered,
 )
 
-
 # ---------------------------------------------------------------------------
 # Deal size from the cover page
 # ---------------------------------------------------------------------------
+
 
 def test_filed_shares_reads_the_banner_count():
     cover = "Subject to completion, dated May 11, 2022 Prospectus 16,000,000 shares ProFrac Holding"
@@ -51,6 +51,7 @@ def test_filed_shares_ignores_a_count_far_from_the_banner():
 # ---------------------------------------------------------------------------
 # Expanding-window prospectus uniqueness
 # ---------------------------------------------------------------------------
+
 
 def _corpus(n: int) -> tuple[list[str], list[str], list[pd.Timestamp]]:
     boilerplate = "risk factors the company may not achieve profitability market conditions "
@@ -115,6 +116,7 @@ def test_uniqueness_is_computed_within_sector():
 # Derived features
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def raw() -> pd.DataFrame:
     return pd.DataFrame(
@@ -150,8 +152,8 @@ def test_risk_concentration_ratio_guards_division_by_zero(raw):
 
 def test_top_tier_uses_the_carter_manaster_cut_off(raw):
     out = add_derived_features(raw)
-    assert out["top_tier_underwriter"].iloc[0] == 1.0   # rank 9
-    assert out["top_tier_underwriter"].iloc[1] == 0.0   # rank 5
+    assert out["top_tier_underwriter"].iloc[0] == 1.0  # rank 9
+    assert out["top_tier_underwriter"].iloc[1] == 0.0  # rank 5
     assert np.isnan(out["top_tier_underwriter"].iloc[2])  # unranked stays missing
 
 

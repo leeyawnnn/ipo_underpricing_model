@@ -30,6 +30,7 @@ TOY_DICT = {
 # Tokenisation
 # ---------------------------------------------------------------------------
 
+
 def test_tokenise_strips_punctuation_and_splits_contractions():
     # The apostrophe is neither \w nor \s, so it becomes a space and the
     # contraction splits. The old docstring claimed "firm's" survived intact.
@@ -38,7 +39,11 @@ def test_tokenise_strips_punctuation_and_splits_contractions():
 
 def test_tokenise_drops_standalone_numbers_but_keeps_alphanumerics():
     assert tokenise("revenue of 15 million in Q3 2024") == [
-        "revenue", "of", "million", "in", "q3",
+        "revenue",
+        "of",
+        "million",
+        "in",
+        "q3",
     ]
 
 
@@ -58,6 +63,7 @@ def test_tokenise_punctuation_only():
 # ---------------------------------------------------------------------------
 # LM ratios
 # ---------------------------------------------------------------------------
+
 
 def test_compute_lm_ratios_hand_computed():
     # 8 tokens: adverse loss the company reported a profitable quarter
@@ -108,19 +114,26 @@ def test_real_dictionary_category_sizes(lm_dict):
     # Guards the loader against a silently empty category, which is what the
     # StrongModal/Strong_Modal column-name mismatch used to produce.
     assert set(lm_dict) == {
-        "lm_negative", "lm_positive", "lm_uncertainty", "lm_litigious",
-        "lm_constraining", "lm_modal_strong", "lm_modal_weak",
+        "lm_negative",
+        "lm_positive",
+        "lm_uncertainty",
+        "lm_litigious",
+        "lm_constraining",
+        "lm_modal_strong",
+        "lm_modal_weak",
     }
     for name, words in lm_dict.items():
         assert len(words) > 0, f"{name} loaded empty"
         assert all(w == w.upper() for w in list(words)[:50])
-    assert lm_dict["lm_negative"] == {w for w in lm_dict["lm_negative"]}
-    assert len(lm_dict["lm_negative"]) > len(lm_dict["lm_positive"])
+    # LM's negative list is an order of magnitude larger than its positive
+    # one; if that inverts, the wrong columns were read.
+    assert len(lm_dict["lm_negative"]) > 5 * len(lm_dict["lm_positive"])
 
 
 # ---------------------------------------------------------------------------
 # Readability
 # ---------------------------------------------------------------------------
+
 
 def test_count_syllables_examples():
     assert _count_syllables("cat") == 1

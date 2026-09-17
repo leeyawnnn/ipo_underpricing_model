@@ -65,6 +65,7 @@ LM_CATEGORIES = [
 # Multiple testing
 # ---------------------------------------------------------------------------
 
+
 def adjust_family(p_values: dict[str, float], alpha: float = ALPHA) -> pd.DataFrame:
     """Apply Bonferroni and Benjamini-Hochberg across a family of tests.
 
@@ -83,9 +84,11 @@ def adjust_family(p_values: dict[str, float], alpha: float = ALPHA) -> pd.DataFr
         >>> float(out.loc[out.test == "a", "p_bonferroni"].iloc[0])
         0.002
     """
-    frame = pd.DataFrame(
-        {"test": list(p_values), "p_raw": [p_values[k] for k in p_values]}
-    ).sort_values("p_raw", na_position="last").reset_index(drop=True)
+    frame = (
+        pd.DataFrame({"test": list(p_values), "p_raw": [p_values[k] for k in p_values]})
+        .sort_values("p_raw", na_position="last")
+        .reset_index(drop=True)
+    )
 
     testable = frame["p_raw"].notna()
     m = int(testable.sum())
@@ -112,6 +115,7 @@ def adjust_family(p_values: dict[str, float], alpha: float = ALPHA) -> pd.DataFr
 # ---------------------------------------------------------------------------
 # H1
 # ---------------------------------------------------------------------------
+
 
 def test_h1_litigious_tone(
     df: pd.DataFrame,
@@ -159,9 +163,7 @@ def test_h1_litigious_tone(
     _, p_value = stats.spearmanr(data[lit_col], data[target_col])
 
     labels = [f"Q{i}" for i in range(1, n_quintiles + 1)]
-    data = data.assign(
-        _bin=pd.qcut(data[lit_col], q=n_quintiles, labels=labels, duplicates="drop")
-    )
+    data = data.assign(_bin=pd.qcut(data[lit_col], q=n_quintiles, labels=labels, duplicates="drop"))
 
     quintiles = []
     groups = []
@@ -170,7 +172,7 @@ def test_h1_litigious_tone(
         quintiles.append(
             {
                 "quintile": str(label),
-                "n": int(len(group)),
+                "n": len(group),
                 "median": point,
                 "ci_low": lo,
                 "ci_high": hi,
@@ -198,14 +200,15 @@ def test_h1_litigious_tone(
                 "ci_low": lo,
                 "ci_high": hi,
                 "p_value": float(category_p),
-                "n": int(len(pair)),
+                "n": len(pair),
             }
         )
     category_frame = pd.DataFrame(by_category)
     if not category_frame.empty:
         category_frame = category_frame.merge(
-            adjust_family(dict(zip(category_frame["category"], category_frame["p_value"])))
-            .rename(columns={"test": "category"})[["category", "p_bonferroni", "p_bh"]],
+            adjust_family(dict(zip(category_frame["category"], category_frame["p_value"]))).rename(
+                columns={"test": "category"}
+            )[["category", "p_bonferroni", "p_bh"]],
             on="category",
             how="left",
         )
@@ -261,14 +264,31 @@ def h1_robustness(
     def add_spearman(label: str, frame: pd.DataFrame) -> None:
         pair = frame[[target_col, lit_col]].dropna()
         if len(pair) < 30:
-            rows.append({"specification": label, "n": len(pair), "estimate": np.nan,
-                         "ci_low": np.nan, "ci_high": np.nan, "p_value": np.nan,
-                         "kind": "spearman"})
+            rows.append(
+                {
+                    "specification": label,
+                    "n": len(pair),
+                    "estimate": np.nan,
+                    "ci_low": np.nan,
+                    "ci_high": np.nan,
+                    "p_value": np.nan,
+                    "kind": "spearman",
+                }
+            )
             return
         rho, lo, hi = spearman_ci(pair[lit_col], pair[target_col])
         _, p = stats.spearmanr(pair[lit_col], pair[target_col])
-        rows.append({"specification": label, "n": len(pair), "estimate": rho,
-                     "ci_low": lo, "ci_high": hi, "p_value": float(p), "kind": "spearman"})
+        rows.append(
+            {
+                "specification": label,
+                "n": len(pair),
+                "estimate": rho,
+                "ci_low": lo,
+                "ci_high": hi,
+                "p_value": float(p),
+                "kind": "spearman",
+            }
+        )
 
     add_spearman("Baseline (all filings)", df)
 
@@ -288,18 +308,51 @@ def h1_robustness(
     # Multivariate specifications. Each adds one layer of control.
     specs: list[tuple[str, list[str], bool, bool]] = [
         ("OLS: litigious only", [], False, False),
-        ("OLS: + deal and market controls", ["log_offer_price", "log_offer_size",
-                                             "vix_at_pricing", "nasdaq_30d_return",
-                                             "is_spac"], False, False),
-        ("OLS: + log document length", ["log_offer_price", "log_offer_size",
-                                        "vix_at_pricing", "nasdaq_30d_return",
-                                        "is_spac", "log_prospectus_words"], False, False),
-        ("OLS: + sector fixed effects", ["log_offer_price", "log_offer_size",
-                                         "vix_at_pricing", "nasdaq_30d_return",
-                                         "is_spac", "log_prospectus_words"], True, False),
-        ("OLS: + sector and year fixed effects", ["log_offer_price", "log_offer_size",
-                                                  "vix_at_pricing", "nasdaq_30d_return",
-                                                  "is_spac", "log_prospectus_words"], True, True),
+        (
+            "OLS: + deal and market controls",
+            ["log_offer_price", "log_offer_size", "vix_at_pricing", "nasdaq_30d_return", "is_spac"],
+            False,
+            False,
+        ),
+        (
+            "OLS: + log document length",
+            [
+                "log_offer_price",
+                "log_offer_size",
+                "vix_at_pricing",
+                "nasdaq_30d_return",
+                "is_spac",
+                "log_prospectus_words",
+            ],
+            False,
+            False,
+        ),
+        (
+            "OLS: + sector fixed effects",
+            [
+                "log_offer_price",
+                "log_offer_size",
+                "vix_at_pricing",
+                "nasdaq_30d_return",
+                "is_spac",
+                "log_prospectus_words",
+            ],
+            True,
+            False,
+        ),
+        (
+            "OLS: + sector and year fixed effects",
+            [
+                "log_offer_price",
+                "log_offer_size",
+                "vix_at_pricing",
+                "nasdaq_30d_return",
+                "is_spac",
+                "log_prospectus_words",
+            ],
+            True,
+            True,
+        ),
     ]
     for label, controls, sector_fe, year_fe in specs:
         result = _ols_litigious(df, target_col, lit_col, controls, sector_fe, year_fe)
@@ -326,8 +379,13 @@ def _ols_litigious(
         frame["ipo_year"] = df["ipo_year"]
     frame = frame.dropna()
     if len(frame) < 40:
-        return {"n": len(frame), "estimate": np.nan, "ci_low": np.nan,
-                "ci_high": np.nan, "p_value": np.nan}
+        return {
+            "n": len(frame),
+            "estimate": np.nan,
+            "ci_low": np.nan,
+            "ci_high": np.nan,
+            "p_value": np.nan,
+        }
 
     design = frame[[lit_col, *usable]].astype(float)
     if sector_fe:
@@ -335,8 +393,12 @@ def _ols_litigious(
         design = pd.concat([design, dummies.loc[:, dummies.nunique() > 1]], axis=1)
     if year_fe:
         design = pd.concat(
-            [design, pd.get_dummies(frame["ipo_year"].astype(int), prefix="year",
-                                    drop_first=True, dtype=float)],
+            [
+                design,
+                pd.get_dummies(
+                    frame["ipo_year"].astype(int), prefix="year", drop_first=True, dtype=float
+                ),
+            ],
             axis=1,
         )
     design = sm.add_constant(design)
@@ -355,6 +417,7 @@ def _ols_litigious(
 # ---------------------------------------------------------------------------
 # H2
 # ---------------------------------------------------------------------------
+
 
 def test_h2_underwriter_translation(
     df: pd.DataFrame,
@@ -383,13 +446,24 @@ def test_h2_underwriter_translation(
     """
     needed = [target_col, lit_col, tier_col]
     if any(c not in df.columns for c in needed):
-        return {"hypothesis": "H2: underwriter translation", "test": "columns missing",
-                "p_value": float("nan"), "reject_h0": False, "n": 0}
+        return {
+            "hypothesis": "H2: underwriter translation",
+            "test": "columns missing",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": 0,
+        }
 
-    data = df[needed + ["log_offer_price", "log_offer_size", "vix_at_pricing",
-                        "nasdaq_30d_return", "is_spac", "sector", "ipo_year"]].dropna(
-        subset=needed
-    )
+    controls = [
+        "log_offer_price",
+        "log_offer_size",
+        "vix_at_pricing",
+        "nasdaq_30d_return",
+        "is_spac",
+        "sector",
+        "ipo_year",
+    ]
+    data = df[[*needed, *controls]].dropna(subset=needed)
     top = data[data[tier_col] == 1]
     other = data[data[tier_col] == 0]
     if len(top) < 30 or len(other) < 30:
@@ -417,11 +491,28 @@ def test_h2_underwriter_translation(
         )
     diff_lo, diff_hi = np.nanpercentile(diffs, [2.5, 97.5])
 
-    frame = data.dropna(subset=["log_offer_price", "log_offer_size", "vix_at_pricing",
-                                "nasdaq_30d_return", "is_spac"]).copy()
+    frame = data.dropna(
+        subset=[
+            "log_offer_price",
+            "log_offer_size",
+            "vix_at_pricing",
+            "nasdaq_30d_return",
+            "is_spac",
+        ]
+    ).copy()
     frame["_interaction"] = frame[lit_col] * frame[tier_col]
-    design = frame[[lit_col, tier_col, "_interaction", "log_offer_price", "log_offer_size",
-                    "vix_at_pricing", "nasdaq_30d_return", "is_spac"]].astype(float)
+    design = frame[
+        [
+            lit_col,
+            tier_col,
+            "_interaction",
+            "log_offer_price",
+            "log_offer_size",
+            "vix_at_pricing",
+            "nasdaq_30d_return",
+            "is_spac",
+        ]
+    ].astype(float)
     design = pd.concat(
         [design, pd.get_dummies(frame["sector"], prefix="sector", drop_first=True, dtype=float)],
         axis=1,
@@ -441,10 +532,10 @@ def test_h2_underwriter_translation(
         "main_p_value": float(model.pvalues[lit_col]),
         "top_rho": top_rho,
         "top_ci": (top_lo, top_hi),
-        "top_n": int(len(top)),
+        "top_n": len(top),
         "other_rho": other_rho,
         "other_ci": (other_lo, other_hi),
-        "other_n": int(len(other)),
+        "other_n": len(other),
         "rho_difference": top_rho - other_rho,
         "rho_difference_ci": (float(diff_lo), float(diff_hi)),
         "n": int(model.nobs),
@@ -463,6 +554,7 @@ def test_h2_underwriter_translation(
 # ---------------------------------------------------------------------------
 # H3
 # ---------------------------------------------------------------------------
+
 
 def test_h3_disclosure_concentration(
     df: pd.DataFrame,
@@ -488,15 +580,25 @@ def test_h3_disclosure_concentration(
         and per-tercile medians with bootstrap intervals.
     """
     if ratio_col not in df.columns:
-        return {"hypothesis": "H3: disclosure concentration", "test": "column missing",
-                "p_value": float("nan"), "reject_h0": False, "n": 0}
+        return {
+            "hypothesis": "H3: disclosure concentration",
+            "test": "column missing",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": 0,
+        }
 
     data = df[[target_col, ratio_col]].dropna()
     data = data[np.isfinite(data[ratio_col])]
     n = len(data)
     if n < 30:
-        return {"hypothesis": "H3: disclosure concentration", "test": "insufficient data",
-                "p_value": float("nan"), "reject_h0": False, "n": n}
+        return {
+            "hypothesis": "H3: disclosure concentration",
+            "test": "insufficient data",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": n,
+        }
 
     rho, lo, hi = spearman_ci(data[ratio_col], data[target_col])
     _, p_value = stats.spearmanr(data[ratio_col], data[target_col])
@@ -507,9 +609,16 @@ def test_h3_disclosure_concentration(
     terciles, groups = [], []
     for label, group in data.groupby("_bin", observed=True):
         point, tlo, thi = bootstrap_ci(group[target_col].to_numpy())
-        terciles.append({"tercile": str(label), "n": int(len(group)), "median": point,
-                         "ci_low": tlo, "ci_high": thi,
-                         "concentration_median": float(group[ratio_col].median())})
+        terciles.append(
+            {
+                "tercile": str(label),
+                "n": len(group),
+                "median": point,
+                "ci_low": tlo,
+                "ci_high": thi,
+                "concentration_median": float(group[ratio_col].median()),
+            }
+        )
         groups.append(group[target_col].to_numpy())
     kw_stat, kw_p = stats.kruskal(*groups) if len(groups) > 1 else (float("nan"), float("nan"))
 
@@ -558,8 +667,13 @@ def test_h4_vix_variance(
     """Levene's test for equal first-day-return variance across VIX terciles."""
     data = df[[target_col, vix_col]].dropna()
     if len(data) < 60:
-        return {"hypothesis": "H4: VIX and return variance", "test": "insufficient data",
-                "p_value": float("nan"), "reject_h0": False, "n": len(data)}
+        return {
+            "hypothesis": "H4: VIX and return variance",
+            "test": "insufficient data",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": len(data),
+        }
 
     data = data.assign(_bin=pd.qcut(data[vix_col], q=3, labels=["Low", "Mid", "High"]))
     groups, spreads = [], {}
@@ -583,7 +697,7 @@ def test_h4_vix_variance(
         "fligner_statistic": float(fk_statistic),
         "fligner_p_value": float(fk_p),
         "groups": spreads,
-        "n": int(len(data)),
+        "n": len(data),
         "reject_h0": bool(p_value < alpha),
         "robust_reject_h0": bool(fk_p < alpha),
         "interpretation": (
@@ -605,9 +719,13 @@ def test_h5_underwriter_variance(
 ) -> dict[str, Any]:
     """Levene's test for equal variance between top-tier and other underwriters."""
     if tier_col not in df.columns:
-        return {"hypothesis": "H5: underwriter tier and return variance",
-                "test": "column missing", "p_value": float("nan"),
-                "reject_h0": False, "n": 0}
+        return {
+            "hypothesis": "H5: underwriter tier and return variance",
+            "test": "column missing",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": 0,
+        }
 
     data = df[[target_col, tier_col]].dropna()
     top = data.loc[data[tier_col] == 1, target_col].to_numpy()
@@ -616,7 +734,9 @@ def test_h5_underwriter_variance(
         return {
             "hypothesis": "H5: underwriter tier and return variance",
             "test": f"insufficient subsample (top n={len(top)}, other n={len(other)})",
-            "p_value": float("nan"), "reject_h0": False, "n": len(data),
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": len(data),
         }
 
     statistic, p_value = stats.levene(top, other, center="median")
@@ -637,8 +757,8 @@ def test_h5_underwriter_variance(
             subsample = {
                 "levene_statistic": float(clean_stat),
                 "levene_p_value": float(clean_p),
-                "top_n": int(len(clean_top)),
-                "other_n": int(len(clean_other)),
+                "top_n": len(clean_top),
+                "other_n": len(clean_other),
                 "top_std": float(np.std(clean_top, ddof=1)),
                 "other_std": float(np.std(clean_other, ddof=1)),
             }
@@ -656,10 +776,10 @@ def test_h5_underwriter_variance(
         "other_spread": other_spread,
         "top_std": top_spread["std"],
         "other_std": other_spread["std"],
-        "top_n": int(len(top)),
-        "other_n": int(len(other)),
+        "top_n": len(top),
+        "other_n": len(other),
         "ex_split_adjusted": subsample,
-        "n": int(len(data)),
+        "n": len(data),
         "reject_h0": bool(p_value < alpha),
         "robust_reject_h0": bool(fk_p < alpha),
         "interpretation": (
@@ -672,7 +792,8 @@ def test_h5_underwriter_variance(
                 f" Excluding split-adjusted prices: Levene p = "
                 f"{subsample['levene_p_value']:.4g} (n = {subsample['top_n']} versus "
                 f"{subsample['other_n']})."
-                if subsample else ""
+                if subsample
+                else ""
             )
         ),
     }
@@ -681,6 +802,7 @@ def test_h5_underwriter_variance(
 # ---------------------------------------------------------------------------
 # H6
 # ---------------------------------------------------------------------------
+
 
 def test_h6_text_features(
     df: pd.DataFrame,
@@ -702,28 +824,48 @@ def test_h6_text_features(
         AIC/BIC deltas and the feature lists used.
     """
     base_features = [
-        c for c in ["log_offer_price", "log_offer_size", "vix_at_pricing",
-                    "nasdaq_30d_return", "hot_market_dummy", "is_spac",
-                    "max_underwriter_rank"]
+        c
+        for c in [
+            "log_offer_price",
+            "log_offer_size",
+            "vix_at_pricing",
+            "nasdaq_30d_return",
+            "hot_market_dummy",
+            "is_spac",
+            "max_underwriter_rank",
+        ]
         if c in df.columns and df[c].notna().any()
     ]
     text_feature_names = [
-        c for c in ["lm_negative_ratio", "lm_positive_ratio", "lm_uncertainty_ratio",
-                    "lm_litigious_ratio", "gunning_fog", "prospectus_uniqueness",
-                    "log_prospectus_words"]
+        c
+        for c in [
+            "lm_negative_ratio",
+            "lm_positive_ratio",
+            "lm_uncertainty_ratio",
+            "lm_litigious_ratio",
+            "gunning_fog",
+            "prospectus_uniqueness",
+            "log_prospectus_words",
+        ]
         if c in df.columns and df[c].notna().any()
     ]
 
     frame = df[[target_col, "sector", *base_features, *text_feature_names]].dropna()
     if len(frame) < 60:
-        return {"hypothesis": "H6: incremental value of text features",
-                "test": "insufficient data", "p_value": float("nan"),
-                "reject_h0": False, "n": len(frame)}
+        return {
+            "hypothesis": "H6: incremental value of text features",
+            "test": "insufficient data",
+            "p_value": float("nan"),
+            "reject_h0": False,
+            "n": len(frame),
+        }
 
     sector_dummies = pd.get_dummies(frame["sector"], prefix="sector", drop_first=True, dtype=float)
     y = frame[target_col].astype(float)
 
-    x_base = sm.add_constant(pd.concat([frame[base_features].astype(float), sector_dummies], axis=1))
+    x_base = sm.add_constant(
+        pd.concat([frame[base_features].astype(float), sector_dummies], axis=1)
+    )
     x_full = sm.add_constant(
         pd.concat([frame[base_features + text_feature_names].astype(float), sector_dummies], axis=1)
     )
@@ -748,7 +890,7 @@ def test_h6_text_features(
         "delta_bic": float(base_model.bic - full_model.bic),
         "base_features": base_features,
         "text_features": text_feature_names,
-        "n": int(len(frame)),
+        "n": len(frame),
         "reject_h0": bool(p_value < alpha) if np.isfinite(p_value) else False,
         "interpretation": (
             f"LR = {lr_statistic:.2f} on {degrees} df, p = {p_value:.4g}, n = {len(frame)}. "
@@ -762,6 +904,7 @@ def test_h6_text_features(
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
+
 
 def run_all(df: pd.DataFrame, alpha: float = ALPHA) -> dict[str, Any]:
     """Run the six-test family and apply multiple-testing correction.
@@ -793,11 +936,12 @@ def run_all(df: pd.DataFrame, alpha: float = ALPHA) -> dict[str, Any]:
     # opposite directions here - H4 is significant only under the robust test,
     # H5 only under the non-robust one - so both families are reported and
     # neither is presented as the answer.
-    robust_p = {}
+    robust_p: dict[str, float] = {}
     for key, value in results.items():
         if not isinstance(value, dict):
             continue
-        robust_p[key] = value.get("fligner_p_value", value.get("p_value", float("nan")))
+        candidate = value.get("fligner_p_value", value.get("p_value"))
+        robust_p[key] = float(candidate) if candidate is not None else float("nan")
     results["adjusted_robust"] = adjust_family(robust_p, alpha=alpha)
 
     results["h1_robustness"] = h1_robustness(df)
@@ -815,8 +959,11 @@ def report(result: dict[str, Any]) -> None:
     for label, key in [("Statistic", "statistic"), ("p-value", "p_value"), ("n", "n")]:
         value = result.get(key)
         if value is not None:
-            print(f"  {label:<12} {value:.4g}" if isinstance(value, (int, float)) else
-                  f"  {label:<12} {value}")
+            print(
+                f"  {label:<12} {value:.4g}"
+                if isinstance(value, (int, float))
+                else f"  {label:<12} {value}"
+            )
     if "ci_95" in result:
         lo, hi = result["ci_95"]
         print(f"  {'95% CI':<12} [{lo:.4g}, {hi:.4g}]")

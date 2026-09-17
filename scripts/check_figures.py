@@ -52,7 +52,8 @@ def main() -> int:
             print(f"ok  {name}  {size / 1024:.0f} KB")
 
     unexpected = sorted(
-        p.name for p in directory.glob("*")
+        p.name
+        for p in directory.glob("*")
         if p.is_file() and p.suffix in {".png", ".svg"} and p.name not in EXPECTED
     )
     for name in unexpected:

@@ -29,6 +29,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from cycler import cycler
 from matplotlib.colors import TwoSlopeNorm
 from matplotlib.ticker import FuncFormatter
 
@@ -149,7 +150,7 @@ def apply_style() -> None:
             "axes.spines.right": False,
             "axes.grid": True,
             "axes.grid.axis": "y",
-            "axes.prop_cycle": mpl.cycler(color=QUALITATIVE),
+            "axes.prop_cycle": cycler(color=QUALITATIVE),
             "grid.color": GRID,
             "grid.linewidth": 0.7,
             "grid.alpha": 1.0,
@@ -172,6 +173,7 @@ def apply_style() -> None:
 # Formatters
 # ---------------------------------------------------------------------------
 
+
 def percent_formatter(decimals: int = 1) -> FuncFormatter:
     """Axis formatter turning 0.123 into '12.3%'."""
     return FuncFormatter(lambda v, _pos: f"{v * 100:.{decimals}f}%")
@@ -192,6 +194,7 @@ def diverging_norm(vmin: float, vmax: float, center: float = 0.0) -> TwoSlopeNor
 # ---------------------------------------------------------------------------
 # Uncertainty
 # ---------------------------------------------------------------------------
+
 
 def bootstrap_ci(
     values: Sequence[float],
@@ -258,6 +261,7 @@ def spearman_ci(
 # Composition helpers
 # ---------------------------------------------------------------------------
 
+
 def titles(fig: plt.Figure, title: str, subtitle: str) -> None:
     """Place a finding-led title and a sample/period/units subtitle.
 
@@ -266,8 +270,9 @@ def titles(fig: plt.Figure, title: str, subtitle: str) -> None:
         title: States the finding, not the variable names.
         subtitle: Sample, period and units.
     """
-    fig.suptitle(title, fontsize=SIZE_TITLE, fontweight="semibold",
-                 x=0.012, ha="left", y=0.975, color=INK)
+    fig.suptitle(
+        title, fontsize=SIZE_TITLE, fontweight="semibold", x=0.012, ha="left", y=0.975, color=INK
+    )
     fig.text(0.012, 0.932, subtitle, fontsize=SIZE_SUBTITLE, ha="left", color=MUTED)
 
 
@@ -307,8 +312,13 @@ def callout(
         color=color,
         ha="left",
         va="center",
-        arrowprops={"arrowstyle": "-", "color": MUTED, "linewidth": 0.9,
-                    "shrinkA": 2, "shrinkB": 4},
+        arrowprops={
+            "arrowstyle": "-",
+            "color": MUTED,
+            "linewidth": 0.9,
+            "shrinkA": 2,
+            "shrinkB": 4,
+        },
     )
 
 

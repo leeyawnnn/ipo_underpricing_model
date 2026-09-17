@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import math
 
-import pandas as pd
 import pytest
 
 from src.sic_sectors import UNCLASSIFIED, load_crosswalk, sector_for_sic
@@ -23,10 +22,10 @@ from src.underwriters import (
     syndicate_summary,
 )
 
-
 # ---------------------------------------------------------------------------
 # SIC crosswalk
 # ---------------------------------------------------------------------------
+
 
 def test_crosswalk_ranges_do_not_overlap():
     # load_crosswalk raises on overlap; calling it is the assertion.
@@ -38,19 +37,19 @@ def test_crosswalk_ranges_do_not_overlap():
 @pytest.mark.parametrize(
     ("sic", "expected"),
     [
-        (6770, "SPAC"),            # the SEC's own "Blank Checks" code
-        (2834, "Healthcare"),      # pharmaceutical preparations
-        (2836, "Healthcare"),      # biological products
-        (2821, "Materials"),       # plastics, just below the drug block
-        (7372, "Technology"),      # prepackaged software
+        (6770, "SPAC"),  # the SEC's own "Blank Checks" code
+        (2834, "Healthcare"),  # pharmaceutical preparations
+        (2836, "Healthcare"),  # biological products
+        (2821, "Materials"),  # plastics, just below the drug block
+        (7372, "Technology"),  # prepackaged software
         (7310, "Communication Services"),
-        (1311, "Energy"),          # crude petroleum and natural gas
-        (6798, "Real Estate"),     # REITs, carved out of the 67xx block
+        (1311, "Energy"),  # crude petroleum and natural gas
+        (6798, "Real Estate"),  # REITs, carved out of the 67xx block
         (6022, "Financials"),
         (4911, "Utilities"),
         (3711, "Consumer Discretionary"),
-        (8731, "Healthcare"),      # commercial physical and biological research
-        (8711, "Industrials"),     # engineering services
+        (8731, "Healthcare"),  # commercial physical and biological research
+        (8711, "Industrials"),  # engineering services
     ],
 )
 def test_sector_for_sic_known_codes(sic, expected):
@@ -85,6 +84,7 @@ def test_sector_coverage_on_the_real_sample(analysis_sample):
 # ---------------------------------------------------------------------------
 # Underwriter name normalisation
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
@@ -163,6 +163,7 @@ def test_extract_returns_empty_when_no_bank_is_named():
 # ---------------------------------------------------------------------------
 # Period-specific ranks
 # ---------------------------------------------------------------------------
+
 
 def test_ranks_are_period_specific():
     """Ritter publishes a rank per window; reputations move between them."""

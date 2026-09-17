@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Utilities
 # ---------------------------------------------------------------------------
 
+
 def test_setup_logging_returns_a_named_logger():
     from src.utils import setup_logging
 
@@ -79,6 +80,7 @@ def test_retry_gives_up_after_max_attempts():
 # Committed artifacts
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "relative",
     [
@@ -135,7 +137,10 @@ def test_no_unfinished_work_markers_in_tracked_files():
 
     tracked = subprocess.run(
         ["git", "ls-files", "*.py", "*.md", "*.yml", "*.cff", "*.toml"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     pattern = re.compile(r"\b(TODO|FIXME|XXX)\b|\bPhase\s+\d\b")
     offenders = []

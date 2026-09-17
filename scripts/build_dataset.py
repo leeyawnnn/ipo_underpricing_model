@@ -23,10 +23,10 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src import provenance  # noqa: E402
-from src.dataset import assemble, sample_funnel, selection_comparison  # noqa: E402
-from src.feature_engineering import build_all_features  # noqa: E402
-from src.utils import setup_logging  # noqa: E402
+from src import provenance
+from src.dataset import assemble, sample_funnel, selection_comparison
+from src.feature_engineering import build_all_features
+from src.utils import setup_logging
 
 COMMAND = "python scripts/build_dataset.py"
 SOURCES = [
@@ -59,29 +59,37 @@ def main() -> int:
 
     funnel = sample_funnel(df)
     provenance.write_table(
-        funnel, "sample_funnel",
+        funnel,
+        "sample_funnel",
         "IPOs surviving each data requirement, in the order applied",
-        command=COMMAND, inputs=SOURCES, directory=TABLES,
+        command=COMMAND,
+        inputs=SOURCES,
+        directory=TABLES,
     )
     log.info("Sample funnel:\n%s", funnel.to_string(index=False))
 
     comparison = selection_comparison(df)
     provenance.write_table(
-        comparison, "selection_comparison",
+        comparison,
+        "selection_comparison",
         "IPOs with a recovered prospectus compared against those without, on observables",
-        command=COMMAND, inputs=SOURCES, directory=TABLES,
+        command=COMMAND,
+        inputs=SOURCES,
+        directory=TABLES,
     )
-    log.info("Selection comparison (filing recovered vs not):\n%s",
-             comparison.to_string(index=False))
+    log.info(
+        "Selection comparison (filing recovered vs not):\n%s", comparison.to_string(index=False)
+    )
 
-    coverage = (
-        df["sector"].value_counts(dropna=False).rename_axis("sector").reset_index(name="n")
-    )
+    coverage = df["sector"].value_counts(dropna=False).rename_axis("sector").reset_index(name="n")
     coverage["pct"] = (coverage["n"] / len(df) * 100).round(1)
     provenance.write_table(
-        coverage, "sector_coverage",
+        coverage,
+        "sector_coverage",
         "Sector distribution over the full calendar, from SEC-assigned SIC codes",
-        command=COMMAND, inputs=SOURCES, directory=TABLES,
+        command=COMMAND,
+        inputs=SOURCES,
+        directory=TABLES,
     )
 
     FULL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -90,8 +98,7 @@ def main() -> int:
     sample = df[df["underpricing"].notna()].reset_index(drop=True)
     sample.to_parquet(SAMPLE_PATH, index=False)
 
-    log.info("Wrote %s (%d rows) and %s (%d rows)",
-             FULL_PATH, len(df), SAMPLE_PATH, len(sample))
+    log.info("Wrote %s (%d rows) and %s (%d rows)", FULL_PATH, len(df), SAMPLE_PATH, len(sample))
     return 0
 
 

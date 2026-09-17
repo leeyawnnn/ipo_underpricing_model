@@ -37,6 +37,7 @@ def test_underpricing_formula_matches_public_record(ticker, offer, close, expect
 # Split correction
 # ---------------------------------------------------------------------------
 
+
 def _series(values: dict[str, float]) -> pd.Series:
     return pd.Series(list(values.values()), index=pd.DatetimeIndex(list(values)))
 
@@ -85,6 +86,7 @@ def test_timezone_aware_split_index_is_handled():
 # Detecting whether Yahoo has actually restated the series
 # ---------------------------------------------------------------------------
 
+
 def _closes(before: float, after: float, split_date: str) -> pd.Series:
     dates = pd.bdate_range(pd.Timestamp(split_date) - pd.Timedelta(days=20), periods=30)
     split = pd.Timestamp(split_date)
@@ -126,6 +128,7 @@ def test_cumulative_factor_skips_unapplied_splits():
 # ---------------------------------------------------------------------------
 # The committed sample must look like an IPO sample
 # ---------------------------------------------------------------------------
+
 
 def test_sample_first_day_returns_are_plausible(analysis_sample):
     """A guard against the defect that produced the previous results.

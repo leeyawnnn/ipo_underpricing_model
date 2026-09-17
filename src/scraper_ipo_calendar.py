@@ -81,8 +81,9 @@ SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
 
-@retry(max_attempts=5, backoff_factor=2.0, initial_wait=2.0,
-       exceptions=(requests.RequestException,))
+@retry(
+    max_attempts=5, backoff_factor=2.0, initial_wait=2.0, exceptions=(requests.RequestException,)
+)
 @throttle(calls_per_second=2.0)
 def _fetch(url: str) -> str:
     """Fetch *url* and return the response text.
@@ -104,6 +105,7 @@ def _fetch(url: str) -> str:
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
+
 
 def _parse_ipo_table(html: str, year: int) -> pd.DataFrame:
     """Extract the IPO table from a stockanalysis.com year page.
@@ -217,6 +219,7 @@ def _normalise(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
+
 
 def scrape_ipo_calendar(years: list[int] = YEARS) -> pd.DataFrame:
     """Scrape IPO calendar data for the given years.

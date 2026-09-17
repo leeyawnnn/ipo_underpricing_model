@@ -79,7 +79,7 @@ def normalise_name(name: str) -> str:
         'jp morgan'
     """
     text = str(name or "").lower()
-    text = re.sub(r"\([^)]*\)", " ", text)       # drop "(JPM)", "(see ...)"
+    text = re.sub(r"\([^)]*\)", " ", text)  # drop "(JPM)", "(see ...)"
     text = text.replace("&", " and ")
     text = _SUFFIX_RE.sub(" ", text)
     text = _PUNCT_RE.sub(" ", text)
@@ -339,8 +339,7 @@ def load_ranks(path: str = str(RANKS_PATH)) -> pd.DataFrame:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(
-            f"Underwriter ranks not found at {p}. "
-            "Run: python scripts/fetch_underwriter_ranks.py"
+            f"Underwriter ranks not found at {p}. Run: python scripts/fetch_underwriter_ranks.py"
         )
     ranks = pd.read_csv(p)
     ranks["key"] = ranks["underwriter"].map(normalise_name)
@@ -501,11 +500,7 @@ def extract_underwriters(full_text: str, issuer_name: str | None = None) -> list
     if issuer_name:
         issuer_key = normalise_name(issuer_name)
         if len(issuer_key) >= 4:
-            names = [
-                n
-                for n in names
-                if not _shares_identity(normalise_name(n), issuer_key)
-            ]
+            names = [n for n in names if not _shares_identity(normalise_name(n), issuer_key)]
 
     return names
 

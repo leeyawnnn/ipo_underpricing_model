@@ -35,6 +35,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy.stats import spearmanr
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -43,7 +44,6 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from scipy.stats import spearmanr
 
 from src.utils import setup_logging
 
@@ -61,7 +61,7 @@ EXCLUDED_EXACT = frozenset(
     {
         "underpricing",
         "winsorized_underpricing",
-        "offer_price",          # enters as log_offer_price
+        "offer_price",  # enters as log_offer_price
         "split_factor",
         "split_adjusted",
         "trading_day_lag",
@@ -180,8 +180,10 @@ def build_pipeline(features: FeatureSet, estimator: Any) -> Pipeline:
     categorical_steps = Pipeline(
         [
             ("impute", SimpleImputer(strategy="constant", fill_value="Unclassified")),
-            ("encode", OneHotEncoder(handle_unknown="ignore", min_frequency=10,
-                                     sparse_output=False)),
+            (
+                "encode",
+                OneHotEncoder(handle_unknown="ignore", min_frequency=10, sparse_output=False),
+            ),
         ]
     )
     transformer = ColumnTransformer(
@@ -197,6 +199,7 @@ def build_pipeline(features: FeatureSet, estimator: Any) -> Pipeline:
 # ---------------------------------------------------------------------------
 # Model grid
 # ---------------------------------------------------------------------------
+
 
 def candidate_models() -> dict[str, list[tuple[dict, Any]]]:
     """Return the fixed hyperparameter grid, declared before any evaluation.
@@ -216,8 +219,11 @@ def candidate_models() -> dict[str, list[tuple[dict, Any]]]:
             (
                 {"n_estimators": n, "max_depth": d, "min_samples_leaf": 10},
                 RandomForestRegressor(
-                    n_estimators=n, max_depth=d, min_samples_leaf=10,
-                    random_state=RANDOM_STATE, n_jobs=-1,
+                    n_estimators=n,
+                    max_depth=d,
+                    min_samples_leaf=10,
+                    random_state=RANDOM_STATE,
+                    n_jobs=-1,
                 ),
             )
             for n in (300,)
@@ -225,13 +231,24 @@ def candidate_models() -> dict[str, list[tuple[dict, Any]]]:
         ],
         "LightGBM": [
             (
-                {"n_estimators": n, "learning_rate": lr, "num_leaves": leaves,
-                 "min_child_samples": 20},
+                {
+                    "n_estimators": n,
+                    "learning_rate": lr,
+                    "num_leaves": leaves,
+                    "min_child_samples": 20,
+                },
                 lgb.LGBMRegressor(
-                    n_estimators=n, learning_rate=lr, num_leaves=leaves,
-                    min_child_samples=20, subsample=0.8, subsample_freq=1,
-                    colsample_bytree=0.8, reg_lambda=1.0,
-                    random_state=RANDOM_STATE, n_jobs=-1, verbose=-1,
+                    n_estimators=n,
+                    learning_rate=lr,
+                    num_leaves=leaves,
+                    min_child_samples=20,
+                    subsample=0.8,
+                    subsample_freq=1,
+                    colsample_bytree=0.8,
+                    reg_lambda=1.0,
+                    random_state=RANDOM_STATE,
+                    n_jobs=-1,
+                    verbose=-1,
                 ),
             )
             for n in (200, 600)
@@ -290,6 +307,7 @@ def _clone(estimator: Any) -> Any:
 # Cross-validated evaluation
 # ---------------------------------------------------------------------------
 
+
 def cross_validate(
     df: pd.DataFrame,
     target_col: str = TARGET,
@@ -320,8 +338,11 @@ def cross_validate(
     log.info(
         "Cross-validating on n=%d with %d numeric + %d categorical features "
         "(dropped %d for coverage, %d constant)",
-        len(data), len(features.numeric), len(features.categorical),
-        len(features.dropped_missing), len(features.dropped_constant),
+        len(data),
+        len(features.numeric),
+        len(features.categorical),
+        len(features.dropped_missing),
+        len(features.dropped_constant),
     )
 
     grid = candidate_models()
@@ -343,10 +364,11 @@ def cross_validate(
             "test_end": str(data[DATE_COLUMN].iloc[test_idx[-1]].date()),
         }
 
-        for name, value in [("Baseline: train mean", float(np.mean(y_train))),
-                            ("Baseline: train median", float(np.median(y_train)))]:
-            rows.append({**common, "model": name,
-                         **evaluate(y_test, np.full(len(y_test), value))})
+        for name, value in [
+            ("Baseline: train mean", float(np.mean(y_train))),
+            ("Baseline: train median", float(np.median(y_train))),
+        ]:
+            rows.append({**common, "model": name, **evaluate(y_test, np.full(len(y_test), value))})
 
         for name, model_grid in grid.items():
             params, estimator = _select_on_inner_split(
@@ -354,12 +376,14 @@ def cross_validate(
             )
             pipeline = build_pipeline(features, _clone(estimator))
             pipeline.fit(X.iloc[train_idx], y_train)
-            rows.append({
-                **common,
-                "model": name,
-                **evaluate(y_test, pipeline.predict(X.iloc[test_idx])),
-                "params": str(params),
-            })
+            rows.append(
+                {
+                    **common,
+                    "model": name,
+                    **evaluate(y_test, pipeline.predict(X.iloc[test_idx])),
+                    "params": str(params),
+                }
+            )
 
     per_fold = pd.DataFrame(rows)
     summary = (
@@ -399,11 +423,12 @@ def holdout_evaluation(
 
     rows: list[dict] = []
     predictions: dict[str, np.ndarray] = {}
-    common = {"n_train": len(train), "n_test": len(test),
-              "holdout_start": holdout_start}
+    common = {"n_train": len(train), "n_test": len(test), "holdout_start": holdout_start}
 
-    for name, value in [("Baseline: train mean", float(np.mean(y_train))),
-                        ("Baseline: train median", float(np.median(y_train)))]:
+    for name, value in [
+        ("Baseline: train mean", float(np.mean(y_train))),
+        ("Baseline: train median", float(np.median(y_train))),
+    ]:
         pred = np.full(len(y_test), value)
         predictions[name] = pred
         rows.append({**common, "model": name, **evaluate(y_test, pred)})
@@ -419,7 +444,9 @@ def holdout_evaluation(
     return pd.DataFrame(rows).sort_values("r2", ascending=False), predictions, test
 
 
-def fit_final_lightgbm(df: pd.DataFrame, target_col: str = TARGET) -> tuple[Pipeline, pd.DataFrame, FeatureSet]:
+def fit_final_lightgbm(
+    df: pd.DataFrame, target_col: str = TARGET
+) -> tuple[Pipeline, pd.DataFrame, FeatureSet]:
     """Fit LightGBM on the whole sample, for SHAP inspection only.
 
     The returned model is not evaluated: it has seen every row. It exists so
@@ -431,16 +458,26 @@ def fit_final_lightgbm(df: pd.DataFrame, target_col: str = TARGET) -> tuple[Pipe
     data = df.dropna(subset=[target_col]).sort_values(DATE_COLUMN).reset_index(drop=True)
     features = select_features(data)
     estimator = lgb.LGBMRegressor(
-        n_estimators=400, learning_rate=0.05, num_leaves=31, min_child_samples=20,
-        subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=1.0,
-        random_state=RANDOM_STATE, n_jobs=-1, verbose=-1,
+        n_estimators=400,
+        learning_rate=0.05,
+        num_leaves=31,
+        min_child_samples=20,
+        subsample=0.8,
+        subsample_freq=1,
+        colsample_bytree=0.8,
+        reg_lambda=1.0,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        verbose=-1,
     )
     pipeline = build_pipeline(features, estimator)
     pipeline.fit(data[features.all_columns], data[target_col].to_numpy(dtype=float))
     return pipeline, data, features
 
 
-def shap_summary(pipeline: Pipeline, data: pd.DataFrame, features: FeatureSet) -> tuple[Any, pd.DataFrame, np.ndarray]:
+def shap_summary(
+    pipeline: Pipeline, data: pd.DataFrame, features: FeatureSet
+) -> tuple[Any, pd.DataFrame, np.ndarray]:
     """Compute SHAP values for the fitted LightGBM pipeline.
 
     SHAP explains the model, not the data-generating process. When the model's

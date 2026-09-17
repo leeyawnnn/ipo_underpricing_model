@@ -38,6 +38,7 @@ def market() -> pd.DataFrame:
 # Market features must be strictly lagged
 # ---------------------------------------------------------------------------
 
+
 def test_market_features_use_the_prior_trading_day(market):
     ipo_date = market.index[10]
     out = market_as_of_prior_day(pd.Series([ipo_date]), market)
@@ -70,6 +71,7 @@ def test_market_features_are_nan_before_the_series_starts(market):
 # The hot-market threshold must not see the future
 # ---------------------------------------------------------------------------
 
+
 def test_hot_market_threshold_is_expanding_not_full_sample():
     # A quiet first year followed by a boom. With a full-sample threshold the
     # early deals are all "cold" by construction; with an expanding threshold
@@ -89,8 +91,9 @@ def test_hot_market_is_order_invariant():
     dates = pd.date_range("2019-01-01", periods=300, freq="3D").to_series().reset_index(drop=True)
     straight = expanding_hot_market(dates, min_history=40)
     shuffled_index = np.random.default_rng(0).permutation(len(dates))
-    shuffled = expanding_hot_market(dates.iloc[shuffled_index].reset_index(drop=True),
-                                    min_history=40)
+    shuffled = expanding_hot_market(
+        dates.iloc[shuffled_index].reset_index(drop=True), min_history=40
+    )
     # Re-align the shuffled result back to the original order.
     realigned = shuffled.to_numpy()[np.argsort(shuffled_index)]
     np.testing.assert_allclose(straight.to_numpy(), realigned, equal_nan=True)
@@ -99,6 +102,7 @@ def test_hot_market_is_order_invariant():
 # ---------------------------------------------------------------------------
 # The feature set must exclude anything observable at or after the first trade
 # ---------------------------------------------------------------------------
+
 
 def test_no_candidate_feature_is_a_post_listing_quantity():
     for column in NUMERIC_CANDIDATES:
@@ -116,9 +120,17 @@ def test_select_features_rejects_a_post_listing_column(monkeypatch):
 def test_selected_features_are_all_pre_listing(analysis_sample):
     features = select_features(analysis_sample)
     banned = {
-        "underpricing", "first_day_close", "first_day_open", "first_week_return",
-        "first_month_return", "split_factor", "split_adjusted", "first_trade_date",
-        "sector_encoded", "lead_underwriter_encoded", "winsorized_underpricing",
+        "underpricing",
+        "first_day_close",
+        "first_day_open",
+        "first_week_return",
+        "first_month_return",
+        "split_factor",
+        "split_adjusted",
+        "first_trade_date",
+        "sector_encoded",
+        "lead_underwriter_encoded",
+        "winsorized_underpricing",
     }
     assert banned.isdisjoint(set(features.all_columns))
 

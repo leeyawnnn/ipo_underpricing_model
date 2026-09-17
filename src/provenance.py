@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -23,11 +23,17 @@ def git_commit() -> str:
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
         ).stdout.strip()
         dirty = subprocess.run(
             ["git", "status", "--porcelain"],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
         ).stdout.strip()
         return f"{sha}-dirty" if dirty else sha
     except (subprocess.SubprocessError, OSError):
@@ -76,12 +82,10 @@ def write_table(
                 "description": description,
                 "command": command,
                 "git_commit": git_commit(),
-                "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "inputs": [
-                    {"path": str(p), "sha256": sha256(p)} for p in (inputs or [])
-                ],
+                "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+                "inputs": [{"path": str(p), "sha256": sha256(p)} for p in (inputs or [])],
                 "input_sha256": sha256(inputs[0]) if inputs else "",
-                "rows": int(len(frame)),
+                "rows": len(frame),
             },
             indent=2,
         )

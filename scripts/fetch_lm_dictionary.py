@@ -97,8 +97,8 @@ def derive_subset(master: Path = MASTER_PATH, dest: Path = SUBSET_PATH) -> pd.Da
     """Write the seven-category word list derived from *master* to *dest*."""
     df = pd.read_csv(master, low_memory=False)
 
-    word_col = "Word" if "Word" in df.columns else next(
-        c for c in df.columns if c.lower() == "word"
+    word_col = (
+        "Word" if "Word" in df.columns else next(c for c in df.columns if c.lower() == "word")
     )
     out = pd.DataFrame({"word": df[word_col].astype(str).str.upper()})
 

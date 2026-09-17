@@ -24,7 +24,7 @@ from matplotlib.lines import Line2D
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.plotting import style as st  # noqa: E402
+from src.plotting import style as st
 
 SAMPLE_PATH = Path("data/processed/analysis_sample.parquet")
 TABLES = Path("reports/tables")
@@ -48,6 +48,7 @@ MIN_CELL = 5  # cells thinner than this are shown grey, not coloured
 # 01 Distribution of first-day returns
 # ---------------------------------------------------------------------------
 
+
 def fig_distribution(df: pd.DataFrame, out: Path) -> Path:
     values = df["underpricing"].dropna()
     median, mean = float(values.median()), float(values.mean())
@@ -62,14 +63,24 @@ def fig_distribution(df: pd.DataFrame, out: Path) -> Path:
     ax_top.hist(typical, bins=60, color=st.OKABE_ITO["blue"], alpha=0.85)
     ax_top.axvline(median, color=st.OKABE_ITO["vermillion"], linewidth=2)
     ax_top.axvline(mean, color=st.OKABE_ITO["orange"], linewidth=2, linestyle="--")
-    ax_top.annotate(f"median {median:+.1%}", xy=(median, ax_top.get_ylim()[1] * 0.95),
-                    xytext=(8, 0), textcoords="offset points",
-                    color=st.OKABE_ITO["vermillion"], fontsize=st.SIZE_ANNOTATION,
-                    fontweight="semibold")
-    ax_top.annotate(f"mean {mean:+.1%}", xy=(mean, ax_top.get_ylim()[1] * 0.78),
-                    xytext=(8, 0), textcoords="offset points",
-                    color=st.OKABE_ITO["orange"], fontsize=st.SIZE_ANNOTATION,
-                    fontweight="semibold")
+    ax_top.annotate(
+        f"median {median:+.1%}",
+        xy=(median, ax_top.get_ylim()[1] * 0.95),
+        xytext=(8, 0),
+        textcoords="offset points",
+        color=st.OKABE_ITO["vermillion"],
+        fontsize=st.SIZE_ANNOTATION,
+        fontweight="semibold",
+    )
+    ax_top.annotate(
+        f"mean {mean:+.1%}",
+        xy=(mean, ax_top.get_ylim()[1] * 0.78),
+        xytext=(8, 0),
+        textcoords="offset points",
+        color=st.OKABE_ITO["orange"],
+        fontsize=st.SIZE_ANNOTATION,
+        fontweight="semibold",
+    )
     ax_top.set_title(f"Central 90% of the sample ({low:+.0%} to {high:+.0%})")
     ax_top.set_xlabel("First-day return, 5th to 95th percentile (%)")
     ax_top.set_ylabel("IPOs")
@@ -95,13 +106,15 @@ def fig_distribution(df: pd.DataFrame, out: Path) -> Path:
         f"US listings 2019-2024 with a recoverable first-day close. n = {len(values)}. "
         f"{(values > 0).mean():.0%} closed above the offer price.",
     )
-    return st.finish(fig, out / "01_first_day_return_distribution.png",
-                     source=SOURCE_PRICES, as_of=AS_OF)
+    return st.finish(
+        fig, out / "01_first_day_return_distribution.png", source=SOURCE_PRICES, as_of=AS_OF
+    )
 
 
 # ---------------------------------------------------------------------------
 # 02 Sector composition
 # ---------------------------------------------------------------------------
+
 
 def fig_sector_counts(df: pd.DataFrame, out: Path) -> Path:
     counts = df["sector"].value_counts().sort_values()
@@ -109,14 +122,19 @@ def fig_sector_counts(df: pd.DataFrame, out: Path) -> Path:
 
     fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
     colours = [
-        st.MUTED if name == "Unclassified" else st.OKABE_ITO["blue"]
-        for name in counts.index
+        st.MUTED if name == "Unclassified" else st.OKABE_ITO["blue"] for name in counts.index
     ]
     bars = ax.barh(counts.index, counts.to_numpy(), color=colours, height=0.72)
     for bar, value in zip(bars, counts.to_numpy()):
-        ax.annotate(f"{value}", xy=(value, bar.get_y() + bar.get_height() / 2),
-                    xytext=(5, 0), textcoords="offset points", va="center",
-                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
+        ax.annotate(
+            f"{value}",
+            xy=(value, bar.get_y() + bar.get_height() / 2),
+            xytext=(5, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=st.SIZE_ANNOTATION,
+            color=st.INK,
+        )
 
     ax.set_xlabel("IPOs in the analysis sample (count)")
     ax.set_xlim(0, counts.max() * 1.12)
@@ -137,21 +155,27 @@ def fig_sector_counts(df: pd.DataFrame, out: Path) -> Path:
         f"Sector from the registrant's SEC-assigned SIC code via a committed crosswalk. "
         f"n = {len(df)} IPOs, {len(df) - unclassified} classified ({1 - unclassified / len(df):.1%}).",
     )
-    return st.finish(fig, out / "02_sector_composition.svg",
-                     source="Source: SEC company submissions API (sic field); "
-                            "data/external/sic_gics_crosswalk.csv.",
-                     as_of=AS_OF)
+    return st.finish(
+        fig,
+        out / "02_sector_composition.svg",
+        source="Source: SEC company submissions API (sic field); "
+        "data/external/sic_gics_crosswalk.csv.",
+        as_of=AS_OF,
+    )
 
 
 # ---------------------------------------------------------------------------
 # 03 Sector x year median return
 # ---------------------------------------------------------------------------
 
+
 def fig_sector_year(df: pd.DataFrame, out: Path) -> Path:
-    pivot_median = df.pivot_table(index="sector", columns="ipo_year",
-                                  values="underpricing", aggfunc="median")
-    pivot_count = df.pivot_table(index="sector", columns="ipo_year",
-                                 values="underpricing", aggfunc="size")
+    pivot_median = df.pivot_table(
+        index="sector", columns="ipo_year", values="underpricing", aggfunc="median"
+    )
+    pivot_count = df.pivot_table(
+        index="sector", columns="ipo_year", values="underpricing", aggfunc="size"
+    )
     order = pivot_count.sum(axis=1).sort_values(ascending=False).index
     pivot_median, pivot_count = pivot_median.loc[order], pivot_count.loc[order]
 
@@ -160,15 +184,18 @@ def fig_sector_year(df: pd.DataFrame, out: Path) -> Path:
 
     fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
     limit = float(np.nanmax(np.abs(shown.to_numpy()))) if shown.notna().any().any() else 1.0
-    mesh = ax.imshow(shown.to_numpy(), cmap=st.DIVERGING, aspect="auto",
-                     norm=st.diverging_norm(-limit, limit, 0.0))
+    mesh = ax.imshow(
+        shown.to_numpy(),
+        cmap=st.DIVERGING,
+        aspect="auto",
+        norm=st.diverging_norm(-limit, limit, 0.0),
+    )
 
     # Thin and empty cells are drawn grey so they cannot be read as a colour.
     grey = np.where(thin.to_numpy() | pivot_median.isna().to_numpy(), 1.0, np.nan)
     ax.imshow(grey, cmap="Greys", vmin=0, vmax=1.6, aspect="auto")
 
-    ax.set_xticks(range(len(pivot_median.columns)),
-                  [str(int(c)) for c in pivot_median.columns])
+    ax.set_xticks(range(len(pivot_median.columns)), [str(int(c)) for c in pivot_median.columns])
     ax.set_yticks(range(len(pivot_median.index)), list(pivot_median.index))
     ax.grid(visible=False)
 
@@ -183,8 +210,9 @@ def fig_sector_year(df: pd.DataFrame, out: Path) -> Path:
             else:
                 label = f"{value:+.0%}\nn={int(count)}"
                 colour = "white" if abs(value) > limit * 0.55 else st.INK
-            ax.text(j, i, label, ha="center", va="center",
-                    fontsize=st.SIZE_ANNOTATION - 1, color=colour)
+            ax.text(
+                j, i, label, ha="center", va="center", fontsize=st.SIZE_ANNOTATION - 1, color=colour
+            )
 
     bar = fig.colorbar(mesh, ax=ax, pad=0.015, fraction=0.035)
     bar.set_label("Median first-day return (%)", fontsize=st.SIZE_LABEL)
@@ -196,13 +224,15 @@ def fig_sector_year(df: pd.DataFrame, out: Path) -> Path:
         f"Median first-day return by sector and listing year; cell label shows the count. "
         f"Cells with fewer than {MIN_CELL} IPOs are grey, not coloured. n = {len(df)}.",
     )
-    return st.finish(fig, out / "03_sector_year_median_return.png",
-                     source=SOURCE_PRICES, as_of=AS_OF)
+    return st.finish(
+        fig, out / "03_sector_year_median_return.png", source=SOURCE_PRICES, as_of=AS_OF
+    )
 
 
 # ---------------------------------------------------------------------------
 # 04 Sentiment deciles
 # ---------------------------------------------------------------------------
+
 
 def _decile_medians(frame: pd.DataFrame, column: str, target: str, q: int = 10) -> pd.DataFrame:
     frame = frame[[column, target]].dropna()
@@ -212,9 +242,16 @@ def _decile_medians(frame: pd.DataFrame, column: str, target: str, q: int = 10) 
     rows = []
     for index, group in frame.groupby("_bin", observed=True):
         point, low, high = st.bootstrap_ci(group[target].to_numpy())
-        rows.append({"bin": int(index) + 1, "n": len(group), "median": point,
-                     "ci_low": low, "ci_high": high,
-                     "x": float(group[column].median())})
+        rows.append(
+            {
+                "bin": int(index) + 1,
+                "n": len(group),
+                "median": point,
+                "ci_low": low,
+                "ci_high": high,
+                "x": float(group[column].median()),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -233,21 +270,33 @@ def fig_sentiment(df: pd.DataFrame, out: Path) -> Path:
             ax.set_visible(False)
             continue
         ax.errorbar(
-            table["bin"], table["median"],
+            table["bin"],
+            table["median"],
             yerr=[table["median"] - table["ci_low"], table["ci_high"] - table["median"]],
-            fmt="o-", color=st.OKABE_ITO["blue"], ecolor=st.OKABE_ITO["sky"],
-            elinewidth=1.6, capsize=3, markersize=5,
+            fmt="o-",
+            color=st.OKABE_ITO["blue"],
+            ecolor=st.OKABE_ITO["sky"],
+            elinewidth=1.6,
+            capsize=3,
+            markersize=5,
         )
         ax.axhline(0, color=st.MUTED, linewidth=0.9)
         rho, low, high = st.spearman_ci(df[column], df["underpricing"])
-        ax.set_title(f"{label}   rho = {rho:+.3f} [{low:+.2f}, {high:+.2f}]",
-                     fontsize=st.SIZE_SUBTITLE + 1)
+        ax.set_title(
+            f"{label}   rho = {rho:+.3f} [{low:+.2f}, {high:+.2f}]", fontsize=st.SIZE_SUBTITLE + 1
+        )
         ax.set_xlabel(f"{label}-word ratio, decile (1 = lowest)")
         ax.yaxis.set_major_formatter(st.percent_formatter(0))
         ax.set_xticks(range(1, 11))
         n_per = int(table["n"].median())
-        ax.annotate(f"n = {n_per} per decile", xy=(0.98, 0.04), xycoords="axes fraction",
-                    ha="right", fontsize=st.SIZE_FOOTER, color=st.MUTED)
+        ax.annotate(
+            f"n = {n_per} per decile",
+            xy=(0.98, 0.04),
+            xycoords="axes fraction",
+            ha="right",
+            fontsize=st.SIZE_FOOTER,
+            color=st.MUTED,
+        )
 
     axes[0, 0].set_ylabel("Median first-day return (%)")
     axes[1, 0].set_ylabel("Median first-day return (%)")
@@ -266,6 +315,7 @@ def fig_sentiment(df: pd.DataFrame, out: Path) -> Path:
 # 05 VIX and dispersion
 # ---------------------------------------------------------------------------
 
+
 def fig_vix(df: pd.DataFrame, out: Path) -> Path:
     frame = df[["vix_at_pricing", "underpricing"]].dropna()
     frame = frame.assign(
@@ -276,10 +326,15 @@ def fig_vix(df: pd.DataFrame, out: Path) -> Path:
 
     table = _decile_medians(frame, "vix_at_pricing", "underpricing")
     ax_left.errorbar(
-        table["x"], table["median"],
+        table["x"],
+        table["median"],
         yerr=[table["median"] - table["ci_low"], table["ci_high"] - table["median"]],
-        fmt="o-", color=st.OKABE_ITO["blue"], ecolor=st.OKABE_ITO["sky"],
-        elinewidth=1.6, capsize=3, markersize=5,
+        fmt="o-",
+        color=st.OKABE_ITO["blue"],
+        ecolor=st.OKABE_ITO["sky"],
+        elinewidth=1.6,
+        capsize=3,
+        markersize=5,
     )
     ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
     ax_left.set_title("The level does not move with VIX", fontsize=st.SIZE_SUBTITLE + 1)
@@ -296,10 +351,15 @@ def fig_vix(df: pd.DataFrame, out: Path) -> Path:
 
     bars = ax_right.bar(labels, spreads, color=st.OKABE_ITO["orange"], width=0.55)
     for bar, spread, count in zip(bars, spreads, counts):
-        ax_right.annotate(f"{spread:.1%}\nn = {count}",
-                          xy=(bar.get_x() + bar.get_width() / 2, spread),
-                          xytext=(0, 5), textcoords="offset points", ha="center",
-                          fontsize=st.SIZE_ANNOTATION, color=st.INK)
+        ax_right.annotate(
+            f"{spread:.1%}\nn = {count}",
+            xy=(bar.get_x() + bar.get_width() / 2, spread),
+            xytext=(0, 5),
+            textcoords="offset points",
+            ha="center",
+            fontsize=st.SIZE_ANNOTATION,
+            color=st.INK,
+        )
     ax_right.set_title("The dispersion does", fontsize=st.SIZE_SUBTITLE + 1)
     ax_right.set_xlabel("VIX tercile on the day before listing")
     ax_right.set_ylabel("Interquartile range of the first-day return (%)")
@@ -319,13 +379,25 @@ def fig_vix(df: pd.DataFrame, out: Path) -> Path:
 # 06 Correlation heatmap
 # ---------------------------------------------------------------------------
 
+
 def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
     columns = [
-        "underpricing", "log_offer_price", "log_offer_size", "max_underwriter_rank",
-        "vix_at_pricing", "nasdaq_30d_return", "nasdaq_30d_volatility", "hot_market_dummy",
-        "lm_negative_ratio", "lm_positive_ratio", "lm_uncertainty_ratio",
-        "lm_litigious_ratio", "risk_concentration_ratio", "gunning_fog",
-        "prospectus_uniqueness", "log_prospectus_words",
+        "underpricing",
+        "log_offer_price",
+        "log_offer_size",
+        "max_underwriter_rank",
+        "vix_at_pricing",
+        "nasdaq_30d_return",
+        "nasdaq_30d_volatility",
+        "hot_market_dummy",
+        "lm_negative_ratio",
+        "lm_positive_ratio",
+        "lm_uncertainty_ratio",
+        "lm_litigious_ratio",
+        "risk_concentration_ratio",
+        "gunning_fog",
+        "prospectus_uniqueness",
+        "log_prospectus_words",
     ]
     columns = [c for c in columns if c in df.columns]
     corr = df[columns].corr(method="pearson")
@@ -338,8 +410,10 @@ def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
     others = [c for c in columns if c != "underpricing"]
     distance = 1 - corr.loc[others, others].abs().to_numpy()
     np.fill_diagonal(distance, 0.0)
-    ordered = [others[i] for i in leaves_list(linkage(squareform(distance, checks=False),
-                                                      method="average"))]
+    ordered = [
+        others[i]
+        for i in leaves_list(linkage(squareform(distance, checks=False), method="average"))
+    ]
     order = ["underpricing", *ordered]
     corr = corr.loc[order, order]
 
@@ -347,8 +421,9 @@ def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
     shown = corr.mask(mask)
 
     fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
-    mesh = ax.imshow(shown.to_numpy(), cmap=st.DIVERGING,
-                     norm=st.diverging_norm(-1.0, 1.0, 0.0), aspect="auto")
+    mesh = ax.imshow(
+        shown.to_numpy(), cmap=st.DIVERGING, norm=st.diverging_norm(-1.0, 1.0, 0.0), aspect="auto"
+    )
     ax.set_xticks(range(len(order)), order, rotation=45, ha="right", fontsize=st.SIZE_FOOTER)
     ax.set_yticks(range(len(order)), order, fontsize=st.SIZE_FOOTER)
     ax.grid(visible=False)
@@ -356,12 +431,26 @@ def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
     for i in range(len(order)):
         for j in range(i + 1):
             value = corr.iat[i, j]
-            ax.text(j, i, f"{value:.2f}", ha="center", va="center",
-                    fontsize=st.SIZE_FOOTER - 1,
-                    color="white" if abs(value) > 0.55 else st.INK)
+            ax.text(
+                j,
+                i,
+                f"{value:.2f}",
+                ha="center",
+                va="center",
+                fontsize=st.SIZE_FOOTER - 1,
+                color="white" if abs(value) > 0.55 else st.INK,
+            )
 
-    ax.add_patch(plt.Rectangle((-0.5, -0.5), len(order), 1, fill=False,
-                               edgecolor=st.OKABE_ITO["vermillion"], linewidth=2.2))
+    ax.add_patch(
+        plt.Rectangle(
+            (-0.5, -0.5),
+            len(order),
+            1,
+            fill=False,
+            edgecolor=st.OKABE_ITO["vermillion"],
+            linewidth=2.2,
+        )
+    )
     strongest = corr.loc["underpricing"].drop("underpricing").abs().max()
 
     bar = fig.colorbar(mesh, ax=ax, pad=0.015, fraction=0.035)
@@ -381,6 +470,7 @@ def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
 # 07 Litigious quintiles, the former headline
 # ---------------------------------------------------------------------------
 
+
 def fig_litigious(df: pd.DataFrame, out: Path) -> Path:
     quintiles = pd.read_csv(TABLES / "h1_quintiles.csv")
     robustness = pd.read_csv(TABLES / "h1_robustness.csv")
@@ -390,43 +480,86 @@ def fig_litigious(df: pd.DataFrame, out: Path) -> Path:
     frame = subsample[["lm_litigious_ratio", "underpricing"]].dropna()
     if len(frame) >= 50:
         frame = frame.assign(
-            _bin=pd.qcut(frame["lm_litigious_ratio"], q=5,
-                         labels=[f"Q{i}" for i in range(1, 6)], duplicates="drop")
+            _bin=pd.qcut(
+                frame["lm_litigious_ratio"],
+                q=5,
+                labels=[f"Q{i}" for i in range(1, 6)],
+                duplicates="drop",
+            )
         )
         for label, group in frame.groupby("_bin", observed=True):
             point, low, high = st.bootstrap_ci(group["underpricing"].to_numpy())
-            clean_rows.append({"quintile": str(label), "n": len(group),
-                               "median": point, "ci_low": low, "ci_high": high})
+            clean_rows.append(
+                {
+                    "quintile": str(label),
+                    "n": len(group),
+                    "median": point,
+                    "ci_low": low,
+                    "ci_high": high,
+                }
+            )
     clean = pd.DataFrame(clean_rows)
 
     fig, (ax_left, ax_right) = plt.subplots(
-        1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
+        1,
+        2,
+        figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
         gridspec_kw={"width_ratios": [1.15, 1]},
     )
 
     positions = np.arange(len(quintiles))
     width = 0.38
-    ax_left.bar(positions - width / 2, quintiles["median"], width=width,
-                color=st.OKABE_ITO["blue"], label="All filings")
-    ax_left.errorbar(positions - width / 2, quintiles["median"],
-                     yerr=[quintiles["median"] - quintiles["ci_low"],
-                           quintiles["ci_high"] - quintiles["median"]],
-                     fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+    ax_left.bar(
+        positions - width / 2,
+        quintiles["median"],
+        width=width,
+        color=st.OKABE_ITO["blue"],
+        label="All filings",
+    )
+    ax_left.errorbar(
+        positions - width / 2,
+        quintiles["median"],
+        yerr=[
+            quintiles["median"] - quintiles["ci_low"],
+            quintiles["ci_high"] - quintiles["median"],
+        ],
+        fmt="none",
+        ecolor=st.INK,
+        elinewidth=1.4,
+        capsize=4,
+    )
     if not clean.empty:
-        ax_left.bar(positions + width / 2, clean["median"], width=width,
-                    color=st.OKABE_ITO["orange"], hatch="//",
-                    label="Excluding split-corrected prices")
-        ax_left.errorbar(positions + width / 2, clean["median"],
-                         yerr=[clean["median"] - clean["ci_low"],
-                               clean["ci_high"] - clean["median"]],
-                         fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+        ax_left.bar(
+            positions + width / 2,
+            clean["median"],
+            width=width,
+            color=st.OKABE_ITO["orange"],
+            hatch="//",
+            label="Excluding split-corrected prices",
+        )
+        ax_left.errorbar(
+            positions + width / 2,
+            clean["median"],
+            yerr=[clean["median"] - clean["ci_low"], clean["ci_high"] - clean["median"]],
+            fmt="none",
+            ecolor=st.INK,
+            elinewidth=1.4,
+            capsize=4,
+        )
 
-    headroom = float(max(quintiles["ci_high"].max(),
-                         clean["ci_high"].max() if not clean.empty else 0))
+    headroom = float(
+        max(quintiles["ci_high"].max(), clean["ci_high"].max() if not clean.empty else 0)
+    )
     for x, row in zip(positions, quintiles.itertuples()):
-        ax_left.annotate(f"n = {row.n}", xy=(x, headroom), xytext=(0, 16),
-                         textcoords="offset points", ha="center",
-                         fontsize=st.SIZE_FOOTER, color=st.MUTED)
+        ax_left.annotate(
+            f"n = {row.n}",
+            xy=(x, headroom),
+            xytext=(0, 16),
+            textcoords="offset points",
+            ha="center",
+            fontsize=st.SIZE_FOOTER,
+            color=st.MUTED,
+        )
     ax_left.set_ylim(0, headroom * 1.30)
 
     ax_left.set_xticks(positions, quintiles["quintile"])
@@ -435,21 +568,30 @@ def fig_litigious(df: pd.DataFrame, out: Path) -> Path:
     ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
     ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
     ax_left.legend(loc="upper center", ncol=2, bbox_to_anchor=(0.5, -0.13))
-    ax_left.set_title("Medians by quintile, with 95% bootstrap intervals",
-                      fontsize=st.SIZE_SUBTITLE + 1)
+    ax_left.set_title(
+        "Medians by quintile, with 95% bootstrap intervals", fontsize=st.SIZE_SUBTITLE + 1
+    )
 
     specs = robustness[robustness["kind"] == "spearman"].dropna(subset=["estimate"])
     specs = specs.iloc[::-1]
     y = np.arange(len(specs))
     ax_right.errorbar(
-        specs["estimate"], y,
+        specs["estimate"],
+        y,
         xerr=[specs["estimate"] - specs["ci_low"], specs["ci_high"] - specs["estimate"]],
-        fmt="o", color=st.OKABE_ITO["blue"], ecolor=st.MUTED,
-        elinewidth=1.4, capsize=3, markersize=5,
+        fmt="o",
+        color=st.OKABE_ITO["blue"],
+        ecolor=st.MUTED,
+        elinewidth=1.4,
+        capsize=3,
+        markersize=5,
     )
     ax_right.axvline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.4)
-    ax_right.set_yticks(y, [f"{s}  (n={n})" for s, n in zip(specs["specification"], specs["n"])],
-                        fontsize=st.SIZE_FOOTER)
+    ax_right.set_yticks(
+        y,
+        [f"{s}  (n={n})" for s, n in zip(specs["specification"], specs["n"])],
+        fontsize=st.SIZE_FOOTER,
+    )
     ax_right.set_xlabel("Spearman rho with the first-day return")
     ax_right.grid(axis="x")
     ax_right.grid(axis="y", visible=False)
@@ -470,6 +612,7 @@ def fig_litigious(df: pd.DataFrame, out: Path) -> Path:
 # 08 Disclosure concentration
 # ---------------------------------------------------------------------------
 
+
 def fig_disclosure(df: pd.DataFrame, out: Path) -> Path:
     terciles = pd.read_csv(TABLES / "h3_terciles.csv")
     frame = df[["risk_concentration_ratio", "underpricing"]].dropna()
@@ -479,15 +622,26 @@ def fig_disclosure(df: pd.DataFrame, out: Path) -> Path:
 
     positions = np.arange(len(terciles))
     ax_left.bar(positions, terciles["median"], width=0.55, color=st.OKABE_ITO["green"])
-    ax_left.errorbar(positions, terciles["median"],
-                     yerr=[terciles["median"] - terciles["ci_low"],
-                           terciles["ci_high"] - terciles["median"]],
-                     fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+    ax_left.errorbar(
+        positions,
+        terciles["median"],
+        yerr=[terciles["median"] - terciles["ci_low"], terciles["ci_high"] - terciles["median"]],
+        fmt="none",
+        ecolor=st.INK,
+        elinewidth=1.4,
+        capsize=4,
+    )
     tercile_headroom = float(terciles["ci_high"].max())
     for x, row in zip(positions, terciles.itertuples()):
-        ax_left.annotate(f"n = {row.n}", xy=(x, tercile_headroom), xytext=(0, 14),
-                         textcoords="offset points", ha="center",
-                         fontsize=st.SIZE_FOOTER, color=st.MUTED)
+        ax_left.annotate(
+            f"n = {row.n}",
+            xy=(x, tercile_headroom),
+            xytext=(0, 14),
+            textcoords="offset points",
+            ha="center",
+            fontsize=st.SIZE_FOOTER,
+            color=st.MUTED,
+        )
     ax_left.set_ylim(0, tercile_headroom * 1.28)
     ax_left.set_xticks(positions, [t.replace(" ", "\n", 1) for t in terciles["tercile"]])
     ax_left.set_ylabel("Median first-day return (%)")
@@ -495,8 +649,14 @@ def fig_disclosure(df: pd.DataFrame, out: Path) -> Path:
     ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
     ax_left.set_title("Medians overlap across terciles", fontsize=st.SIZE_SUBTITLE + 1)
 
-    ax_right.scatter(frame["risk_concentration_ratio"], frame["underpricing"],
-                     s=14, alpha=0.45, color=st.OKABE_ITO["blue"], edgecolors="none")
+    ax_right.scatter(
+        frame["risk_concentration_ratio"],
+        frame["underpricing"],
+        s=14,
+        alpha=0.45,
+        color=st.OKABE_ITO["blue"],
+        edgecolors="none",
+    )
     ax_right.set_yscale("symlog", linthresh=1)
     ax_right.set_xlabel("Risk-factor share of prospectus negative tone (ratio)")
     ax_right.set_ylabel("First-day return (%, log scale)")
@@ -512,20 +672,22 @@ def fig_disclosure(df: pd.DataFrame, out: Path) -> Path:
         f"Spearman rho = {rho:+.3f} (95% CI [{low:+.3f}, {high:+.3f}]) on n = {len(frame)}. "
         "Bars show 95% bootstrap intervals on each tercile median.",
     )
-    return st.finish(fig, out / "08_disclosure_concentration.png",
-                     source=SOURCE_TEXT, as_of=AS_OF)
+    return st.finish(fig, out / "08_disclosure_concentration.png", source=SOURCE_TEXT, as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
 # 09 Model performance
 # ---------------------------------------------------------------------------
 
+
 def fig_models(out: Path) -> Path:
     per_fold = pd.read_csv(TABLES / "model_cv_per_fold.csv")
     summary = pd.read_csv(TABLES / "model_cv_summary.csv")
 
     fig, (ax_left, ax_right) = plt.subplots(
-        1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
+        1,
+        2,
+        figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
         gridspec_kw={"width_ratios": [1, 1.25]},
     )
 
@@ -533,8 +695,7 @@ def fig_models(out: Path) -> Path:
     y = np.arange(len(order))
     means = [summary.loc[summary["model"] == m, "r2_mean"].iloc[0] for m in order]
     colours = [
-        st.OKABE_ITO["green"] if m.startswith("Baseline") else st.OKABE_ITO["blue"]
-        for m in order
+        st.OKABE_ITO["green"] if m.startswith("Baseline") else st.OKABE_ITO["blue"] for m in order
     ]
     ax_left.barh(y, means, color=colours, height=0.6)
     for yi, model in zip(y, order):
@@ -547,11 +708,17 @@ def fig_models(out: Path) -> Path:
     ax_left.set_xlabel("Out-of-sample R-squared (mean across folds; bar spans fold min to max)")
     ax_left.grid(axis="x")
     ax_left.grid(axis="y", visible=False)
-    ax_left.set_title("Every model is worse than predicting the training median",
-                      fontsize=st.SIZE_SUBTITLE + 1)
-    ax_left.annotate("R² = 0 means\n'as good as the\ntraining mean'",
-                     xy=(0, len(order) - 0.5), xytext=(4, -6), textcoords="offset points",
-                     fontsize=st.SIZE_FOOTER, color=st.OKABE_ITO["vermillion"])
+    ax_left.set_title(
+        "Every model is worse than predicting the training median", fontsize=st.SIZE_SUBTITLE + 1
+    )
+    ax_left.annotate(
+        "R² = 0 means\n'as good as the\ntraining mean'",
+        xy=(0, len(order) - 0.5),
+        xytext=(4, -6),
+        textcoords="offset points",
+        fontsize=st.SIZE_FOOTER,
+        color=st.OKABE_ITO["vermillion"],
+    )
 
     models = [m for m in summary["model"] if not m.startswith("Baseline")]
     for colour, model in zip(st.QUALITATIVE, sorted(models)):
@@ -560,16 +727,21 @@ def fig_models(out: Path) -> Path:
         st.direct_label(ax_right, rows["fold"].iloc[-1], rows["r2"].iloc[-1], f"  {model}", colour)
     baseline = per_fold[per_fold["model"] == "Baseline: train median"].sort_values("fold")
     ax_right.plot(baseline["fold"], baseline["r2"], "--", color=st.MUTED, linewidth=1.6)
-    st.direct_label(ax_right, baseline["fold"].iloc[0], baseline["r2"].iloc[0],
-                    "median baseline  ", st.MUTED, ha="right")
+    st.direct_label(
+        ax_right,
+        baseline["fold"].iloc[0],
+        baseline["r2"].iloc[0],
+        "median baseline  ",
+        st.MUTED,
+        ha="right",
+    )
 
     ax_right.axhline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.2)
     ax_right.set_xticks(sorted(per_fold["fold"].unique()))
     ax_right.set_xlabel("Expanding-window fold (1 = earliest listings)")
     ax_right.set_ylabel("Out-of-sample R-squared")
     ax_right.set_xlim(0.6, per_fold["fold"].max() + 1.1)
-    ax_right.set_title("Fold-to-fold variation dwarfs the average",
-                       fontsize=st.SIZE_SUBTITLE + 1)
+    ax_right.set_title("Fold-to-fold variation dwarfs the average", fontsize=st.SIZE_SUBTITLE + 1)
 
     n_train = int(per_fold["n_train"].max())
     n_test = int(per_fold["n_test"].max())
@@ -587,6 +759,7 @@ def fig_models(out: Path) -> Path:
 # 10 Holdout predictions and residuals
 # ---------------------------------------------------------------------------
 
+
 def fig_holdout(df: pd.DataFrame, out: Path) -> Path:
     from src.models import holdout_evaluation
 
@@ -598,11 +771,17 @@ def fig_holdout(df: pd.DataFrame, out: Path) -> Path:
 
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
 
-    ax_left.scatter(predicted, actual, s=22, alpha=0.6,
-                    color=st.OKABE_ITO["blue"], edgecolors="none")
+    ax_left.scatter(
+        predicted, actual, s=22, alpha=0.6, color=st.OKABE_ITO["blue"], edgecolors="none"
+    )
     limit = float(max(np.abs(actual).max(), np.abs(predicted).max())) * 1.08
-    ax_left.plot([-limit, limit], [-limit, limit], color=st.OKABE_ITO["vermillion"],
-                 linewidth=1.5, linestyle="--")
+    ax_left.plot(
+        [-limit, limit],
+        [-limit, limit],
+        color=st.OKABE_ITO["vermillion"],
+        linewidth=1.5,
+        linestyle="--",
+    )
     ax_left.set_xlim(-limit, limit)
     ax_left.set_ylim(-limit, limit)
     ax_left.set_xlabel("Predicted first-day return (%)")
@@ -610,20 +789,33 @@ def fig_holdout(df: pd.DataFrame, out: Path) -> Path:
     ax_left.xaxis.set_major_formatter(st.percent_formatter(0))
     ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
     ax_left.grid(axis="both")
-    ax_left.set_title(f"Predictions cluster near the mean (R² = {r2:.2f})",
-                      fontsize=st.SIZE_SUBTITLE + 1)
-    ax_left.legend(handles=[Line2D([], [], color=st.OKABE_ITO["vermillion"],
-                                   linestyle="--", label="perfect prediction")],
-                   loc="upper left")
+    ax_left.set_title(
+        f"Predictions cluster near the mean (R² = {r2:.2f})", fontsize=st.SIZE_SUBTITLE + 1
+    )
+    ax_left.legend(
+        handles=[
+            Line2D(
+                [], [], color=st.OKABE_ITO["vermillion"], linestyle="--", label="perfect prediction"
+            )
+        ],
+        loc="upper left",
+    )
 
-    ax_right.scatter(pd.to_datetime(test["ipo_date"]), residuals, s=22, alpha=0.6,
-                     color=st.OKABE_ITO["orange"], edgecolors="none")
+    ax_right.scatter(
+        pd.to_datetime(test["ipo_date"]),
+        residuals,
+        s=22,
+        alpha=0.6,
+        color=st.OKABE_ITO["orange"],
+        edgecolors="none",
+    )
     ax_right.axhline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.4)
     ax_right.set_xlabel("Listing date")
     ax_right.set_ylabel("Residual, actual minus predicted (%)")
     ax_right.yaxis.set_major_formatter(st.percent_formatter(0))
-    ax_right.set_title("Residuals are as large as the returns themselves",
-                       fontsize=st.SIZE_SUBTITLE + 1)
+    ax_right.set_title(
+        "Residuals are as large as the returns themselves", fontsize=st.SIZE_SUBTITLE + 1
+    )
     fig.autofmt_xdate(rotation=30)
 
     st.titles(
@@ -634,28 +826,33 @@ def fig_holdout(df: pd.DataFrame, out: Path) -> Path:
         "LightGBM; the training-median baseline scores R² = "
         f"{float(metrics.loc[metrics['model'] == 'Baseline: train median', 'r2'].iloc[0]):.3f}.",
     )
-    return st.finish(fig, out / "10_holdout_predictions.svg",
-                     source=SOURCE_MODELS, as_of=AS_OF)
+    return st.finish(fig, out / "10_holdout_predictions.svg", source=SOURCE_MODELS, as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
 # 11 SHAP
 # ---------------------------------------------------------------------------
 
+
 def fig_shap(out: Path) -> Path:
     importance = pd.read_csv(TABLES / "shap_importance.csv").head(12).iloc[::-1]
     labels = [
-        f.replace("numeric__", "").replace("categorical__", "")
-        for f in importance["feature"]
+        f.replace("numeric__", "").replace("categorical__", "") for f in importance["feature"]
     ]
 
     fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
     y = np.arange(len(importance))
     bars = ax.barh(y, importance["mean_abs_shap"], color=st.OKABE_ITO["purple"], height=0.66)
     for bar, value in zip(bars, importance["mean_abs_shap"]):
-        ax.annotate(f"{value:.3f}", xy=(value, bar.get_y() + bar.get_height() / 2),
-                    xytext=(5, 0), textcoords="offset points", va="center",
-                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
+        ax.annotate(
+            f"{value:.3f}",
+            xy=(value, bar.get_y() + bar.get_height() / 2),
+            xytext=(5, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=st.SIZE_ANNOTATION,
+            color=st.INK,
+        )
     ax.set_yticks(y, labels, fontsize=st.SIZE_ANNOTATION)
     ax.set_xlabel("Mean |SHAP value| (percentage points of predicted first-day return)")
     ax.set_xlim(0, importance["mean_abs_shap"].max() * 1.16)
@@ -684,6 +881,7 @@ def fig_shap(out: Path) -> Path:
 # 12 Sample funnel
 # ---------------------------------------------------------------------------
 
+
 def fig_funnel(out: Path) -> Path:
     full = pd.read_csv(TABLES / "sample_funnel.csv")
     # Steps that remove nothing add a bar without adding information.
@@ -693,15 +891,26 @@ def fig_funnel(out: Path) -> Path:
     y = np.arange(len(funnel))[::-1]
     bars = ax.barh(y, funnel["n"], color=st.OKABE_ITO["blue"], height=0.62)
     for bar, row in zip(bars, funnel.itertuples()):
-        ax.annotate(f"{row.n:,}   ({row.pct_of_universe:.0f}% of the calendar)",
-                    xy=(row.n, bar.get_y() + bar.get_height() / 2),
-                    xytext=(6, 0), textcoords="offset points", va="center",
-                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
+        ax.annotate(
+            f"{row.n:,}   ({row.pct_of_universe:.0f}% of the calendar)",
+            xy=(row.n, bar.get_y() + bar.get_height() / 2),
+            xytext=(6, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=st.SIZE_ANNOTATION,
+            color=st.INK,
+        )
         if row.dropped:
-            ax.annotate(f"-{row.dropped:,}",
-                        xy=(row.n, bar.get_y() + bar.get_height()),
-                        xytext=(-6, 6), textcoords="offset points", va="center", ha="right",
-                        fontsize=st.SIZE_FOOTER, color=st.OKABE_ITO["vermillion"])
+            ax.annotate(
+                f"-{row.dropped:,}",
+                xy=(row.n, bar.get_y() + bar.get_height()),
+                xytext=(-6, 6),
+                textcoords="offset points",
+                va="center",
+                ha="right",
+                fontsize=st.SIZE_FOOTER,
+                color=st.OKABE_ITO["vermillion"],
+            )
 
     ax.set_yticks(y, funnel["step"], fontsize=st.SIZE_ANNOTATION)
     ax.set_xlabel("IPOs remaining (count)")
@@ -726,11 +935,16 @@ def fig_funnel(out: Path) -> Path:
         f"return and {full['n'].iloc[-1]:,} with a prospectus. "
         "Steps that remove nothing are omitted; red labels show what each requirement costs.",
     )
-    return st.finish(fig, out / "12_sample_funnel.svg",
-                     source="Source: reports/tables/sample_funnel.csv.", as_of=AS_OF)
+    return st.finish(
+        fig,
+        out / "12_sample_funnel.svg",
+        source="Source: reports/tables/sample_funnel.csv.",
+        as_of=AS_OF,
+    )
 
 
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

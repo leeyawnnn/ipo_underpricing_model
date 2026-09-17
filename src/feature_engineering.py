@@ -56,6 +56,7 @@ _COVER_SEARCH_CHARS = 8_000
 # Deal size from the prospectus cover
 # ---------------------------------------------------------------------------
 
+
 def filed_shares_offered(full_text: str) -> float:
     """Extract the filed base offering size, in shares, from a cover page.
 
@@ -81,6 +82,7 @@ def filed_shares_offered(full_text: str) -> float:
 # ---------------------------------------------------------------------------
 # Prospectus uniqueness, expanding window
 # ---------------------------------------------------------------------------
+
 
 def expanding_prospectus_uniqueness(
     texts: list[str],
@@ -154,6 +156,7 @@ def expanding_prospectus_uniqueness(
 # ---------------------------------------------------------------------------
 # Text features
 # ---------------------------------------------------------------------------
+
 
 def _read(path: object) -> str:
     """Read a text file named by a possibly-missing path column value."""
@@ -234,6 +237,7 @@ def add_text_features(df: pd.DataFrame) -> pd.DataFrame:
 # Derived features
 # ---------------------------------------------------------------------------
 
+
 def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add transforms and ratios built from columns already present.
 
@@ -248,13 +252,14 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    df["log_offer_price"] = np.log(pd.to_numeric(df["offer_price"], errors="coerce").clip(lower=0.01))
+    df["log_offer_price"] = np.log(
+        pd.to_numeric(df["offer_price"], errors="coerce").clip(lower=0.01)
+    )
 
     if "filed_shares_offered" in df.columns:
-        df["filed_offer_size_usd"] = (
-            pd.to_numeric(df["filed_shares_offered"], errors="coerce")
-            * pd.to_numeric(df["offer_price"], errors="coerce")
-        )
+        df["filed_offer_size_usd"] = pd.to_numeric(
+            df["filed_shares_offered"], errors="coerce"
+        ) * pd.to_numeric(df["offer_price"], errors="coerce")
         df["log_offer_size"] = np.log1p(df["filed_offer_size_usd"])
 
     if "word_count" in df.columns:
@@ -265,9 +270,7 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     if {"rf_lm_negative_ratio", "lm_negative_ratio"}.issubset(df.columns):
         denominator = pd.to_numeric(df["lm_negative_ratio"], errors="coerce")
         numerator = pd.to_numeric(df["rf_lm_negative_ratio"], errors="coerce")
-        df["risk_concentration_ratio"] = np.where(
-            denominator > 0, numerator / denominator, np.nan
-        )
+        df["risk_concentration_ratio"] = np.where(denominator > 0, numerator / denominator, np.nan)
 
     # Carter-Manaster 8 is the conventional prestige cut-off (Loughran & Ritter
     # 2004). Applied to the highest-ranked bank in the syndicate.
@@ -287,8 +290,10 @@ def build_all_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with every engineered feature appended.
     """
-    log.info("Extracting text, syndicate and deal-size features from %d filings …",
-             int(df["has_filing"].sum()))
+    log.info(
+        "Extracting text, syndicate and deal-size features from %d filings …",
+        int(df["has_filing"].sum()),
+    )
     df = add_text_features(df)
     log.info("Adding derived features …")
     df = add_derived_features(df)

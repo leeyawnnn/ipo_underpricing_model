@@ -11,10 +11,10 @@ import pytest
 from src.dataset import load_market, sample_funnel, selection_comparison
 from src.provenance import git_commit, sha256, write_table
 
-
 # ---------------------------------------------------------------------------
 # Market series
 # ---------------------------------------------------------------------------
+
 
 def test_load_market_adds_rolling_statistics(tmp_path):
     dates = pd.bdate_range("2020-01-01", periods=80)
@@ -45,6 +45,7 @@ def test_committed_market_series_covers_the_study_window():
 # ---------------------------------------------------------------------------
 # Sample funnel
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def toy() -> pd.DataFrame:
@@ -91,6 +92,7 @@ def test_committed_funnel_matches_the_committed_sample(analysis_sample):
 # Selection comparison
 # ---------------------------------------------------------------------------
 
+
 def test_selection_comparison_reports_both_groups(toy):
     out = selection_comparison(toy)
     assert {"observable", "in_sample", "out_of_sample", "difference", "p_value"} <= set(out.columns)
@@ -120,13 +122,15 @@ def test_selection_comparison_detects_a_planted_difference():
 # Provenance
 # ---------------------------------------------------------------------------
 
+
 def test_write_table_emits_a_provenance_sidecar(tmp_path):
     source = tmp_path / "input.csv"
     source.write_text("a,b\n1,2\n", encoding="utf-8")
     frame = pd.DataFrame({"x": [1, 2, 3]})
 
-    path = write_table(frame, "demo", "a demo table", command="pytest",
-                       inputs=[source], directory=tmp_path)
+    path = write_table(
+        frame, "demo", "a demo table", command="pytest", inputs=[source], directory=tmp_path
+    )
     assert path.exists()
 
     meta = json.loads((tmp_path / "demo.meta.json").read_text())

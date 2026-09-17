@@ -91,7 +91,8 @@ def load_lm_dictionary(path: Path = LM_WORDS_PATH) -> dict[str, set[str]]:
 
     log.info(
         "LM dictionary loaded from %s: %s",
-        path, {k: len(v) for k, v in lm.items()},
+        path,
+        {k: len(v) for k, v in lm.items()},
     )
     return lm
 
@@ -127,6 +128,7 @@ def tokenise(text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Loughran-McDonald sentiment ratios
 # ---------------------------------------------------------------------------
+
 
 def compute_lm_ratios(
     text: str,

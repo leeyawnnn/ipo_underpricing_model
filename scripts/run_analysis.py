@@ -20,9 +20,9 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src import hypothesis_tests as ht  # noqa: E402
-from src import models, provenance  # noqa: E402
-from src.utils import setup_logging  # noqa: E402
+from src import hypothesis_tests as ht
+from src import models, provenance
+from src.utils import setup_logging
 
 log = setup_logging(__name__)
 
@@ -33,7 +33,9 @@ TABLES = Path("reports/tables")
 def write_table(frame: pd.DataFrame, name: str, description: str) -> None:
     """Write *frame* to reports/tables/<name>.csv with a provenance sidecar."""
     path = provenance.write_table(
-        frame, name, description,
+        frame,
+        name,
+        description,
         command="python scripts/run_analysis.py",
         inputs=[SAMPLE_PATH],
     )
@@ -51,7 +53,7 @@ def descriptive_table(df: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "group": label,
-                "n": int(len(values)),
+                "n": len(values),
                 "median": round(float(values.median()), 4),
                 "mean": round(float(values.mean()), 4),
                 "std": round(float(values.std()), 4),
@@ -93,8 +95,9 @@ def hypothesis_summary(results: dict) -> pd.DataFrame:
             }
         )
     frame = pd.DataFrame(rows)
-    adjusted = results["adjusted"][["test", "p_bonferroni", "p_bh",
-                                    "significant_bonferroni", "significant_bh"]]
+    adjusted = results["adjusted"][
+        ["test", "p_bonferroni", "p_bh", "significant_bonferroni", "significant_bh"]
+    ]
     return frame.merge(adjusted, on="test", how="left")
 
 
@@ -104,61 +107,107 @@ def main() -> int:
         return 1
 
     df = pd.read_parquet(SAMPLE_PATH)
-    log.info("Analysis sample: %d rows, %d with a recovered prospectus",
-             len(df), int(df["lm_litigious_ratio"].notna().sum()))
+    log.info(
+        "Analysis sample: %d rows, %d with a recovered prospectus",
+        len(df),
+        int(df["lm_litigious_ratio"].notna().sum()),
+    )
 
-    write_table(descriptive_table(df), "descriptive_statistics",
-                "First-day return distribution overall, by listing year and by split status")
+    write_table(
+        descriptive_table(df),
+        "descriptive_statistics",
+        "First-day return distribution overall, by listing year and by split status",
+    )
 
     log.info("Running the hypothesis family …")
     results = ht.run_all(df)
-    write_table(hypothesis_summary(results), "hypothesis_summary",
-                "Six hypothesis tests with raw, Bonferroni and Benjamini-Hochberg p-values")
-    write_table(results["adjusted"], "multiple_testing_levene",
-                "Family-wise correction using Levene for the two variance tests")
-    write_table(results["adjusted_robust"], "multiple_testing_rank_based",
-                "Family-wise correction using Fligner-Killeen for the two variance tests")
-    write_table(results["h1_robustness"], "h1_robustness",
-                "H1 re-estimated across subsamples and control sets")
-    write_table(results["H1"]["quintiles"], "h1_quintiles",
-                "Median first-day return by litigious-ratio quintile, with bootstrap CIs")
-    write_table(results["H1"]["lm_categories"], "lm_category_correlations",
-                "Spearman rho between each LM category and the first-day return")
+    write_table(
+        hypothesis_summary(results),
+        "hypothesis_summary",
+        "Six hypothesis tests with raw, Bonferroni and Benjamini-Hochberg p-values",
+    )
+    write_table(
+        results["adjusted"],
+        "multiple_testing_levene",
+        "Family-wise correction using Levene for the two variance tests",
+    )
+    write_table(
+        results["adjusted_robust"],
+        "multiple_testing_rank_based",
+        "Family-wise correction using Fligner-Killeen for the two variance tests",
+    )
+    write_table(
+        results["h1_robustness"],
+        "h1_robustness",
+        "H1 re-estimated across subsamples and control sets",
+    )
+    write_table(
+        results["H1"]["quintiles"],
+        "h1_quintiles",
+        "Median first-day return by litigious-ratio quintile, with bootstrap CIs",
+    )
+    write_table(
+        results["H1"]["lm_categories"],
+        "lm_category_correlations",
+        "Spearman rho between each LM category and the first-day return",
+    )
     if isinstance(results["H3"].get("terciles"), pd.DataFrame):
-        write_table(results["H3"]["terciles"], "h3_terciles",
-                    "Median first-day return by disclosure-concentration tercile, with CIs")
+        write_table(
+            results["H3"]["terciles"],
+            "h3_terciles",
+            "Median first-day return by disclosure-concentration tercile, with CIs",
+        )
 
     log.info("Cross-validating models …")
     per_fold, summary = models.cross_validate(df)
-    write_table(per_fold, "model_cv_per_fold",
-                "Per-fold out-of-sample metrics, expanding-window TimeSeriesSplit")
-    write_table(summary, "model_cv_summary",
-                "Out-of-sample metrics averaged across folds, with the spread")
+    write_table(
+        per_fold,
+        "model_cv_per_fold",
+        "Per-fold out-of-sample metrics, expanding-window TimeSeriesSplit",
+    )
+    write_table(
+        summary, "model_cv_summary", "Out-of-sample metrics averaged across folds, with the spread"
+    )
 
-    per_fold_w, summary_w = models.cross_validate(df, winsorise=True)
-    write_table(summary_w, "model_cv_summary_winsorised",
-                "As model_cv_summary, target clipped at the training fold's 1st/99th percentile")
+    _, summary_w = models.cross_validate(df, winsorise=True)
+    write_table(
+        summary_w,
+        "model_cv_summary_winsorised",
+        "As model_cv_summary, target clipped at the training fold's 1st/99th percentile",
+    )
 
     holdout, _, _ = models.holdout_evaluation(df)
-    write_table(holdout, "model_holdout_2024",
-                "Trained on listings before 2024-01-01, scored on 2024 listings")
+    write_table(
+        holdout,
+        "model_holdout_2024",
+        "Trained on listings before 2024-01-01, scored on 2024 listings",
+    )
 
     log.info("Computing SHAP on the full-sample LightGBM …")
     pipeline, fitted_data, features = models.fit_final_lightgbm(df)
     _, importance, _ = models.shap_summary(pipeline, fitted_data, features)
-    write_table(importance.head(25), "shap_importance",
-                "Mean absolute SHAP value per feature for the full-sample LightGBM; "
-                "describes the model, not the data-generating process")
+    write_table(
+        importance.head(25),
+        "shap_importance",
+        "Mean absolute SHAP value per feature for the full-sample LightGBM; "
+        "describes the model, not the data-generating process",
+    )
 
     write_table(
         pd.DataFrame(
             {
-                "role": (["numeric"] * len(features.numeric)
-                         + ["categorical"] * len(features.categorical)
-                         + ["dropped_low_coverage"] * len(features.dropped_missing)
-                         + ["dropped_constant"] * len(features.dropped_constant)),
-                "feature": (features.numeric + features.categorical
-                            + features.dropped_missing + features.dropped_constant),
+                "role": (
+                    ["numeric"] * len(features.numeric)
+                    + ["categorical"] * len(features.categorical)
+                    + ["dropped_low_coverage"] * len(features.dropped_missing)
+                    + ["dropped_constant"] * len(features.dropped_constant)
+                ),
+                "feature": (
+                    features.numeric
+                    + features.categorical
+                    + features.dropped_missing
+                    + features.dropped_constant
+                ),
             }
         ),
         "feature_set",

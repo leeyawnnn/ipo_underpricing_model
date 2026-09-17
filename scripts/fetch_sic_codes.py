@@ -28,7 +28,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.utils import setup_logging  # noqa: E402
+from src.utils import setup_logging
 
 log = setup_logging(__name__)
 
@@ -56,7 +56,7 @@ def user_agent() -> str:
     if not value or "@" not in value:
         raise SystemExit(
             "SEC_EDGAR_USER_AGENT is not set to a contactable address.\n"
-            'Set it, for example:\n'
+            "Set it, for example:\n"
             '  export SEC_EDGAR_USER_AGENT="Jane Doe jane@example.com"\n'
             "SEC fair access (https://www.sec.gov/os/webmaster-faq#developers) "
             "requires a descriptive User-Agent with a contact."
@@ -76,8 +76,7 @@ def ticker_to_cik(session: requests.Session) -> dict[str, str]:
         payload = resp.json()
         cache.write_text(json.dumps(payload), encoding="utf-8")
     return {
-        str(entry["ticker"]).upper(): f'{int(entry["cik_str"]):010d}'
-        for entry in payload.values()
+        str(entry["ticker"]).upper(): f"{int(entry['cik_str']):010d}" for entry in payload.values()
     }
 
 
@@ -106,8 +105,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.ipo_csv.exists():
-        print(f"{args.ipo_csv} not found. Run scripts/fetch_ipo_calendar.py first.",
-              file=sys.stderr)
+        print(
+            f"{args.ipo_csv} not found. Run scripts/fetch_ipo_calendar.py first.", file=sys.stderr
+        )
         return 1
 
     session = requests.Session()
@@ -124,8 +124,15 @@ def main() -> int:
     for i, ticker in enumerate(tickers, start=1):
         cik = cik_map.get(ticker)
         if cik is None:
-            rows.append({"ticker": ticker, "cik": None, "sic": None,
-                         "sic_description": None, "status": "cik_not_found"})
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "cik": None,
+                    "sic": None,
+                    "sic_description": None,
+                    "status": "cik_not_found",
+                }
+            )
             continue
 
         elapsed = time.monotonic() - last
@@ -134,13 +141,15 @@ def main() -> int:
         last = time.monotonic()
 
         sic, description = fetch_sic(session, cik)
-        rows.append({
-            "ticker": ticker,
-            "cik": cik,
-            "sic": sic,
-            "sic_description": description,
-            "status": "ok" if sic else "no_sic",
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "cik": cik,
+                "sic": sic,
+                "sic_description": description,
+                "status": "ok" if sic else "no_sic",
+            }
+        )
         if i % 200 == 0:
             log.info("Progress: %d / %d", i, len(tickers))
 

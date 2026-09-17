@@ -22,10 +22,10 @@ from src.hypothesis_tests import test_h3_disclosure_concentration as run_h3
 from src.hypothesis_tests import test_h4_vix_variance as run_h4
 from src.models import TARGET, build_pipeline, cross_validate, evaluate, select_features
 
-
 # ---------------------------------------------------------------------------
 # Multiple-testing correction
 # ---------------------------------------------------------------------------
+
 
 def test_bonferroni_multiplies_by_the_family_size():
     out = adjust_family({"a": 0.001, "b": 0.01, "c": 0.04, "d": 0.5})
@@ -52,7 +52,7 @@ def test_bh_is_monotone_in_the_raw_p_value():
 def test_nan_p_values_are_excluded_from_the_family_size():
     out = adjust_family({"a": 0.01, "b": float("nan")})
     row = out.set_index("test")
-    assert row.loc["a", "p_bonferroni"] == pytest.approx(0.01)   # family of one
+    assert row.loc["a", "p_bonferroni"] == pytest.approx(0.01)  # family of one
     assert np.isnan(row.loc["b", "p_bonferroni"])
     assert not bool(row.loc["b", "significant_raw"])
 
@@ -60,6 +60,7 @@ def test_nan_p_values_are_excluded_from_the_family_size():
 # ---------------------------------------------------------------------------
 # Planted effect and null data
 # ---------------------------------------------------------------------------
+
 
 def _synthetic(n: int = 400, effect: float = 0.0, seed: int = 11) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
@@ -94,10 +95,7 @@ def test_h1_detects_a_planted_positive_association():
 def test_h1_does_not_reject_on_null_data():
     # Ten independent null draws: at alpha = 0.05 we expect at most a couple
     # of rejections by chance, never most of them.
-    rejections = sum(
-        run_h1(_synthetic(effect=0.0, seed=s))["reject_h0"]
-        for s in range(10)
-    )
+    rejections = sum(run_h1(_synthetic(effect=0.0, seed=s))["reject_h0"] for s in range(10))
     assert rejections <= 2
 
 
@@ -133,11 +131,13 @@ def test_h4_detects_planted_heteroscedasticity():
     rng = np.random.default_rng(5)
     n = 600
     vix = rng.uniform(10, 45, n)
-    frame = pd.DataFrame({
-        "vix_at_pricing": vix,
-        # Dispersion rises with VIX; the centre does not move.
-        "underpricing": rng.normal(0.05, 0.05 + vix / 100, n),
-    })
+    frame = pd.DataFrame(
+        {
+            "vix_at_pricing": vix,
+            # Dispersion rises with VIX; the centre does not move.
+            "underpricing": rng.normal(0.05, 0.05 + vix / 100, n),
+        }
+    )
     result = run_h4(frame)
     assert result["p_value"] < 0.01
     assert result["fligner_p_value"] < 0.01
@@ -146,10 +146,12 @@ def test_h4_detects_planted_heteroscedasticity():
 def test_h4_does_not_reject_under_homoscedasticity():
     rng = np.random.default_rng(6)
     n = 600
-    frame = pd.DataFrame({
-        "vix_at_pricing": rng.uniform(10, 45, n),
-        "underpricing": rng.normal(0.05, 0.3, n),
-    })
+    frame = pd.DataFrame(
+        {
+            "vix_at_pricing": rng.uniform(10, 45, n),
+            "underpricing": rng.normal(0.05, 0.3, n),
+        }
+    )
     result = run_h4(frame)
     assert result["p_value"] > 0.05
     assert result["fligner_p_value"] > 0.05
@@ -158,6 +160,7 @@ def test_h4_does_not_reject_under_homoscedasticity():
 # ---------------------------------------------------------------------------
 # Cross-validation ordering
 # ---------------------------------------------------------------------------
+
 
 def test_time_series_split_never_trains_on_the_future():
     dates = pd.Series(pd.date_range("2019-01-01", periods=400, freq="3D"))
@@ -203,7 +206,9 @@ def test_preprocessing_is_fitted_inside_the_pipeline(analysis_sample):
         analysis_sample[features.all_columns],
         analysis_sample[TARGET].to_numpy(dtype=float),
     )
-    fitted_on_all = pipeline.named_steps["prep"].named_transformers_["numeric"].named_steps["scale"].mean_
+    fitted_on_all = (
+        pipeline.named_steps["prep"].named_transformers_["numeric"].named_steps["scale"].mean_
+    )
     assert not np.allclose(fitted_on_train, fitted_on_all)
 
 
@@ -221,6 +226,7 @@ def test_evaluate_on_perfect_and_constant_predictions():
 # ---------------------------------------------------------------------------
 # The remaining family members, on the real sample
 # ---------------------------------------------------------------------------
+
 
 def test_h2_h5_h6_return_complete_results(analysis_sample):
     from src.hypothesis_tests import (
