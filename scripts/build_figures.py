@@ -1,658 +1,772 @@
-"""
-Generate all publication-quality figures for the IPO underpricing analysis.
+#!/usr/bin/env python3
+"""Regenerate every figure in reports/figures/ from committed data.
 
-Run:
+Deterministic: fixed seeds, sorted iteration, no wall-clock in the output.
+Style, colour, uncertainty and the provenance footer all come from
+src/plotting/style.py so the set reads as one piece of work.
+
+Usage::
+
     python scripts/build_figures.py
-
-All output PNGs land in reports/figures/. The script is idempotent — running
-it again overwrites the previous figures.
-
-Design choices documented inline:
-  - Underpricing is right-skewed AND can be negative (delisted IPOs go to -1).
-    Log scale is used on the y-axis via symlog (signed log) where applicable.
-  - Sector counts are plotted on a log y-axis because SPAC and Industrials
-    dominate the count.
-  - The sentiment-vs-underpricing scatter shows a binned-quantile view
-    (deciles) AFTER trimming the top/bottom 1% of underpricing observations,
-    so a handful of moonshot IPOs don't dominate the visual relationship.
+    python scripts/build_figures.py --out-dir /tmp/ci-figures
 """
+
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
-import seaborn as sns
+from matplotlib.lines import Line2D
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data" / "processed" / "ipo_features.parquet"
-FIG_DIR = ROOT / "reports" / "figures"
-FIG_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-plt.rcParams.update({
-    "figure.dpi": 110,
-    "savefig.dpi": 150,
-    "font.size": 10,
-    "axes.titlesize": 12,
-    "axes.labelsize": 11,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "axes.grid": True,
-    "grid.alpha": 0.25,
-    "grid.linestyle": "--",
-})
+from src.plotting import style as st  # noqa: E402
 
-PRIMARY = "#2563EB"
-ACCENT = "#DC2626"
-NEUTRAL = "#475569"
-GREEN = "#059669"
-ORANGE = "#EA580C"
+SAMPLE_PATH = Path("data/processed/analysis_sample.parquet")
+TABLES = Path("reports/tables")
+DEFAULT_OUT = Path("reports/figures")
+
+AS_OF = "2026-09-17"
+SOURCE_PRICES = (
+    "Source: Yahoo Finance first-day closes, split-corrected; offer prices from "
+    "the stockanalysis.com IPO calendar."
+)
+SOURCE_TEXT = (
+    "Sources: SEC EDGAR S-1/F-1 prospectuses; Loughran-McDonald master dictionary "
+    "(1993-2025); Yahoo Finance first-day closes."
+)
+SOURCE_MODELS = "Source: expanding-window TimeSeriesSplit over the 709-IPO analysis sample."
+
+MIN_CELL = 5  # cells thinner than this are shown grey, not coloured
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 01 Distribution of first-day returns
 # ---------------------------------------------------------------------------
 
-def trim_outliers(s: pd.Series, lo: float = 0.01, hi: float = 0.99) -> pd.Series:
-    """Return *s* with values outside the [lo, hi] quantile range dropped."""
-    if len(s) == 0:
-        return s
-    a, b = s.quantile([lo, hi])
-    return s[(s >= a) & (s <= b)]
+def fig_distribution(df: pd.DataFrame, out: Path) -> Path:
+    values = df["underpricing"].dropna()
+    median, mean = float(values.median()), float(values.mean())
+    # The 99th percentile is above +500%, so a 1-99 trim still leaves the top
+    # panel unreadable. The central 90% is where the mass is.
+    low, high = values.quantile([0.05, 0.95])
+    typical = values[(values >= low) & (values <= high)]
+    top = df.loc[values.idxmax()]
 
+    fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
 
-def save(fig: plt.Figure, name: str) -> None:
-    out = FIG_DIR / name
-    fig.savefig(out, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  → {out.relative_to(ROOT)}")
+    ax_top.hist(typical, bins=60, color=st.OKABE_ITO["blue"], alpha=0.85)
+    ax_top.axvline(median, color=st.OKABE_ITO["vermillion"], linewidth=2)
+    ax_top.axvline(mean, color=st.OKABE_ITO["orange"], linewidth=2, linestyle="--")
+    ax_top.annotate(f"median {median:+.1%}", xy=(median, ax_top.get_ylim()[1] * 0.95),
+                    xytext=(8, 0), textcoords="offset points",
+                    color=st.OKABE_ITO["vermillion"], fontsize=st.SIZE_ANNOTATION,
+                    fontweight="semibold")
+    ax_top.annotate(f"mean {mean:+.1%}", xy=(mean, ax_top.get_ylim()[1] * 0.78),
+                    xytext=(8, 0), textcoords="offset points",
+                    color=st.OKABE_ITO["orange"], fontsize=st.SIZE_ANNOTATION,
+                    fontweight="semibold")
+    ax_top.set_title(f"Central 90% of the sample ({low:+.0%} to {high:+.0%})")
+    ax_top.set_xlabel("First-day return, 5th to 95th percentile (%)")
+    ax_top.set_ylabel("IPOs")
+    ax_top.xaxis.set_major_formatter(st.percent_formatter(0))
 
-
-# Friendly category palette
-SECTOR_ORDER = [
-    "Healthcare", "Technology", "Financials", "SPAC",
-    "Communication Services", "Consumer Discretionary",
-    "Consumer Staples", "Energy", "Industrials",
-    "Materials", "Real Estate",
-]
-
-
-def load_data() -> pd.DataFrame:
-    df = pd.read_parquet(DATA)
-    df["ipo_date"] = pd.to_datetime(df["ipo_date"])
-    df["ipo_year"] = df["ipo_date"].dt.year
-    df["ipo_year_month"] = df["ipo_date"].dt.to_period("M").dt.to_timestamp()
-    return df
-
-
-# ---------------------------------------------------------------------------
-# Figure 1 — Underpricing distribution (linear + symlog)
-# ---------------------------------------------------------------------------
-
-def fig_underpricing_dist(df: pd.DataFrame) -> None:
-    """Two-panel histogram: linear scale (top), symlog (bottom)."""
-    data = df["underpricing"].dropna()
-    trimmed = trim_outliers(data, 0.01, 0.99)
-
-    fig, axes = plt.subplots(2, 1, figsize=(11, 8), gridspec_kw={"hspace": 0.35})
-
-    # Top — trimmed (1st-99th percentile) on a regular linear scale
-    ax = axes[0]
-    ax.hist(trimmed, bins=60, color=PRIMARY, edgecolor="white", alpha=0.85)
-    ax.axvline(0, color=NEUTRAL, lw=1, ls="--", label="Zero return")
-    ax.axvline(trimmed.median(), color=ACCENT, lw=1.5, ls="-",
-               label=f"Median = {trimmed.median():+.1%}")
-    ax.set_title("First-day IPO return — distribution (1%-99% percentile range)")
-    ax.set_xlabel("First-day return")
-    ax.set_ylabel("Number of IPOs")
-    ax.xaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-    ax.legend(loc="upper right", frameon=True)
-
-    # Bottom — full distribution on symmetric-log y-axis
-    ax = axes[1]
-    ax.hist(data, bins=80, color=ORANGE, edgecolor="white", alpha=0.85)
-    ax.set_yscale("symlog", linthresh=1)
-    ax.axvline(0, color=NEUTRAL, lw=1, ls="--")
-    ax.set_title("Full distribution including outliers (y-axis: symmetric log)")
-    ax.set_xlabel("First-day return  (-1 = delisted to zero)")
-    ax.set_ylabel("Number of IPOs (symlog)")
-    ax.xaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-
-    fig.suptitle("Underpricing Distribution — Linear vs. Symlog", fontsize=13, y=1.0)
-    save(fig, "01_underpricing_distribution.png")
-
-
-# ---------------------------------------------------------------------------
-# Figure 2 — Sector counts on log y-axis
-# ---------------------------------------------------------------------------
-
-def fig_sector_counts(df: pd.DataFrame) -> None:
-    counts = df["sector"].value_counts()
-    counts = counts.reindex([s for s in SECTOR_ORDER if s in counts.index])
-
-    fig, ax = plt.subplots(figsize=(11, 5.5))
-    bars = ax.bar(range(len(counts)), counts.values, color=PRIMARY, edgecolor="white")
-    ax.set_yscale("log")
-    ax.set_xticks(range(len(counts)))
-    ax.set_xticklabels(counts.index, rotation=30, ha="right")
-    ax.set_ylabel("Number of IPOs (log scale)")
-    ax.set_title(
-        f"IPOs by GICS Sector, 2019-2024  (n={len(df):,})\n"
-        "All companies classified — no \"Unknown\" / \"Other\" buckets"
-    )
-    for bar, n in zip(bars, counts.values):
-        ax.annotate(f"{n}", (bar.get_x() + bar.get_width() / 2, n),
-                    ha="center", va="bottom", fontsize=9)
-    save(fig, "02_sector_counts_logscale.png")
-
-
-# ---------------------------------------------------------------------------
-# Figure 3 — Sector × Year heatmap (median underpricing)
-# ---------------------------------------------------------------------------
-
-def fig_sector_year_heatmap(df: pd.DataFrame) -> None:
-    """Single heatmap of median first-day return by sector × year."""
-    sector_counts = df["sector"].value_counts()
-    major = [s for s in SECTOR_ORDER if s in sector_counts.head(6).index]
-
-    pivot_med = (df.groupby(["sector", "ipo_year"])["winsorized_underpricing"]
-                   .median().unstack().reindex(SECTOR_ORDER))
-    pivot_n = df.groupby(["sector", "ipo_year"]).size().unstack().reindex(SECTOR_ORDER)
-
-    fig, ax = plt.subplots(figsize=(10, 4.5))
-    sns.heatmap(
-        pivot_med.loc[major] * 100,
-        annot=pivot_n.loc[major].astype("Int64"), fmt="d",
-        cmap="RdBu_r", center=0, vmin=-30, vmax=30,
-        cbar_kws={"label": "Median first-day return (%)"},
-        linewidths=0.4, ax=ax,
-    )
-    ax.set_title(
-        "Median first-day return by sector × year — six highest-volume sectors\n"
-        "(cells annotated with IPO count for that sector × year)"
-    )
-    ax.set_xlabel("IPO year"); ax.set_ylabel("")
-    save(fig, "03_sector_year_heatmap.png")
-
-
-# ---------------------------------------------------------------------------
-# Figure 6 — Sentiment vs Underpricing  (binned quantiles, outliers removed)
-# ---------------------------------------------------------------------------
-
-def fig_sentiment_vs_underpricing(df: pd.DataFrame) -> None:
-    cols = ["lm_negative_ratio", "lm_positive_ratio",
-            "lm_uncertainty_ratio", "lm_litigious_ratio"]
-    titles = ["Negative tone", "Positive tone",
-              "Uncertainty tone", "Litigious tone"]
-
-    # IMPORTANT data-quality fix: the upstream stockanalysis.com `price` field
-    # is a *current* price for delisted tickers, so observations with very
-    # negative "first-day return" (≤ −50%) are usually post-IPO collapses, not
-    # real day-1 closes. Including them contaminates the relationship — the
-    # earlier 10%-90% trim only removed outliers symmetrically and still kept
-    # dozens of −60%/−90% values that pulled every decile median deep into
-    # the red. Restrict to plausibly-true first-day returns (> −50%) and
-    # additionally cap the top tail at the 95th percentile so a single
-    # moonshot doesn't distort the visual.
-    base = df.dropna(subset=cols + ["underpricing"]).copy()
-    # Drop post-IPO collapses (≤ −50% — stockanalysis "current price" for
-    # delisted tickers, not real day-1 close) AND cap day-1 pops at the 90th
-    # percentile so a few moonshots don't crush the visible y-axis range.
-    cap = base["underpricing"].quantile(0.90)
-    clean = base[(base["underpricing"] > -0.5) & (base["underpricing"] <= cap)].copy()
-
-    n_dropped_low = int((base["underpricing"] <= -0.5).sum())
-    n_dropped_high = int((base["underpricing"] > cap).sum())
-    print(
-        f"  sentiment plot: kept {len(clean):,} of {len(base):,} rows  "
-        f"(dropped {n_dropped_low} post-IPO collapses ≤ −50% "
-        f"and {n_dropped_high} moonshots above the 90th pctile = {cap:+.1%})"
+    ax_bottom.hist(values, bins=80, color=st.OKABE_ITO["sky"], alpha=0.9)
+    ax_bottom.set_yscale("symlog", linthresh=1)
+    ax_bottom.set_title("Full range, log-scaled count (log axis, minor ticks shown)")
+    ax_bottom.set_xlabel("First-day return (%)")
+    ax_bottom.set_ylabel("IPOs (log)")
+    ax_bottom.xaxis.set_major_formatter(st.percent_formatter(0))
+    ax_bottom.minorticks_on()
+    st.callout(
+        ax_bottom,
+        f"{top['ticker']} {top['underpricing']:+.0%}\n(Yahoo split history\nis unreliable here)",
+        xy=(float(top["underpricing"]), 1.0),
+        xytext=(float(top["underpricing"]) * 0.55, 60),
     )
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
-    for ax, col, title in zip(axes.ravel(), cols, titles):
-        d = clean.copy()
-        d["_decile"] = pd.qcut(d[col], 10, labels=False, duplicates="drop")
-        agg = (d.groupby("_decile")
-                .agg(x_mid=(col, "mean"),
-                     med=("underpricing", "median"),
-                     q25=("underpricing", lambda s: s.quantile(0.25)),
-                     q75=("underpricing", lambda s: s.quantile(0.75)),
-                     n=("underpricing", "size"))
-                .reset_index())
-
-        rho = d[col].corr(d["underpricing"], method="spearman")
-
-        ax.scatter(d[col], d["underpricing"], s=10, color=NEUTRAL,
-                   alpha=0.22, label="IPOs (clean)")
-        ax.fill_between(agg["x_mid"], agg["q25"], agg["q75"],
-                        color=PRIMARY, alpha=0.20, label="Decile IQR")
-        ax.plot(agg["x_mid"], agg["med"], color=PRIMARY, lw=2.2,
-                marker="o", label="Decile median")
-        ax.axhline(0, color=NEUTRAL, ls="--", lw=0.7)
-        ax.set_title(f"{title}    (Spearman ρ = {rho:+.3f})")
-        ax.set_xlabel(f"LM {col.replace('lm_', '').replace('_ratio','')} word ratio")
-        ax.set_ylabel("First-day return")
-        ax.set_ylim(-0.55, min(1.5, cap * 1.10))
-        ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-        ax.legend(loc="upper right", fontsize=8, frameon=True)
-
-    fig.suptitle(
-        "Loughran-McDonald Sentiment vs. First-day Return\n"
-        f"Post-IPO collapses (≤ −50%) and moonshots (> {cap:+.0%}) excluded — "
-        f"n={len(clean):,} clean first-day returns, values grouped by sentiment decile",
-        fontsize=13, y=1.0,
+    st.titles(
+        fig,
+        "First-day IPO returns are right-skewed with a median near zero",
+        f"US listings 2019-2024 with a recoverable first-day close. n = {len(values)}. "
+        f"{(values > 0).mean():.0%} closed above the offer price.",
     )
-    fig.tight_layout()
-    save(fig, "06_sentiment_vs_underpricing.png")
+    return st.finish(fig, out / "01_first_day_return_distribution.png",
+                     source=SOURCE_PRICES, as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
-# Figure 9 — VIX vs underpricing scatter (with binned median)
+# 02 Sector composition
 # ---------------------------------------------------------------------------
 
-def fig_vix_scatter(df: pd.DataFrame) -> None:
-    # Drop post-IPO collapses (≤ −50%) — same data-quality fix as the
-    # sentiment plot. Cap top tail at 95th percentile so a few moonshots
-    # don't blow out the y-axis on every sector panel.
-    data = df.dropna(subset=["vix_at_pricing", "underpricing", "sector"]).copy()
-    cap = data["underpricing"].quantile(0.95)
-    data = data[(data["underpricing"] > -0.5) & (data["underpricing"] <= cap)].copy()
+def fig_sector_counts(df: pd.DataFrame, out: Path) -> Path:
+    counts = df["sector"].value_counts().sort_values()
+    unclassified = int(counts.get("Unclassified", 0))
 
-    # VIX-regime buckets used by the sector-grouped bar chart. Quantile
-    # cut points are computed on the *whole* sample so every sector is
-    # binned on the same scale.
-    q = data["vix_at_pricing"].quantile([0, 1/3, 2/3, 1.0]).values
-    labels = [f"Low\n(<{q[1]:.0f})",
-              f"Mid\n({q[1]:.0f}–{q[2]:.0f})",
-              f"High\n(>{q[2]:.0f})"]
-    data["vix_regime"] = pd.cut(
-        data["vix_at_pricing"], bins=q, labels=labels, include_lowest=True
-    )
-
-    # Six largest sectors carry the signal; smaller ones (Real Estate, etc.)
-    # have too few rows per VIX bucket to plot meaningfully.
-    sectors = (data["sector"].value_counts().head(6).index.tolist())
-    panel_order = [s for s in SECTOR_ORDER if s in sectors]
-
-    fig = plt.figure(figsize=(14, 9))
-    gs = fig.add_gridspec(3, 3, hspace=0.55, wspace=0.35)
-
-    # Top-left "All sectors" overview panel — the original decile-median view
-    ax0 = fig.add_subplot(gs[0, 0])
-    data["_bin"] = pd.qcut(data["vix_at_pricing"], 10, duplicates="drop")
-    overview = (data.groupby("_bin", observed=True)
-                    .agg(x=("vix_at_pricing", "mean"),
-                         med=("underpricing", "median"))
-                    .reset_index())
-    ax0.scatter(data["vix_at_pricing"], data["underpricing"],
-                s=6, alpha=0.18, color=NEUTRAL)
-    ax0.plot(overview["x"], overview["med"], color=ACCENT, lw=2,
-             marker="o", label="Decile median")
-    ax0.axhline(0, color=NEUTRAL, ls="--", lw=0.7)
-    ax0.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-    ax0.set_xlabel("VIX at pricing")
-    ax0.set_ylabel("First-day return")
-    ax0.set_title(f"All sectors  (n={len(data):,})", fontsize=11)
-    ax0.legend(fontsize=8)
-
-    # Top-right two cells: bar chart — median return per VIX regime × sector
-    ax_bar = fig.add_subplot(gs[0, 1:])
-    bar_data = (data[data["sector"].isin(panel_order)]
-                .groupby(["sector", "vix_regime"], observed=True)["underpricing"]
-                .median().unstack())
-    bar_data = bar_data.reindex(panel_order)
-    bar_data = bar_data[labels]  # enforce Low/Mid/High order
-    x = np.arange(len(bar_data))
-    w = 0.27
-    regime_colors = ["#1d4ed8", "#9ca3af", "#dc2626"]  # blue→grey→red
-    for i, (regime, c) in enumerate(zip(labels, regime_colors)):
-        ax_bar.bar(x + (i - 1) * w, bar_data[regime].values, w,
-                   color=c, label=regime.replace("\n", " "))
-    ax_bar.axhline(0, color=NEUTRAL, lw=0.7)
-    ax_bar.set_xticks(x)
-    ax_bar.set_xticklabels(bar_data.index, rotation=15, ha="right")
-    ax_bar.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-    ax_bar.set_ylabel("Median first-day return")
-    ax_bar.set_title("Median return by sector × VIX regime", fontsize=11)
-    ax_bar.legend(title="VIX regime", fontsize=8, ncol=3, loc="upper left")
-
-    # Six per-sector scatter panels (rows 1 and 2)
-    sector_color = dict(zip(panel_order, sns.color_palette("tab10", len(panel_order))))
-    for i, sector in enumerate(panel_order):
-        r, c = divmod(i, 3)
-        ax = fig.add_subplot(gs[1 + r, c])
-        sd = data[data["sector"] == sector]
-        ax.scatter(sd["vix_at_pricing"], sd["underpricing"],
-                   s=10, alpha=0.30, color=sector_color[sector])
-        # Tercile median trace (deciles too noisy for small panels)
-        if len(sd) >= 15:
-            sd_t = sd.assign(
-                _t=pd.qcut(sd["vix_at_pricing"], 3, duplicates="drop")
-            )
-            tline = (sd_t.groupby("_t", observed=True)
-                         .agg(x=("vix_at_pricing", "mean"),
-                              med=("underpricing", "median"))
-                         .reset_index())
-            ax.plot(tline["x"], tline["med"], color=sector_color[sector],
-                    lw=2, marker="o", label="Tercile median")
-        rho = sd["vix_at_pricing"].corr(sd["underpricing"], method="spearman")
-        ax.axhline(0, color=NEUTRAL, ls="--", lw=0.7)
-        ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-        ax.set_xlabel("VIX at pricing")
-        ax.set_ylabel("First-day return")
-        ax.set_title(f"{sector}  (n={len(sd):,},  ρ={rho:+.2f})", fontsize=10)
-
-    fig.suptitle(
-        "VIX vs. First-day Return — grouped by sector\n"
-        "Post-IPO collapses (≤ −50%) excluded; one panel per major sector",
-        fontsize=13, y=1.0,
-    )
-    save(fig, "09_vix_vs_underpricing.png")
-
-
-# ---------------------------------------------------------------------------
-# Figure 10 — Correlation heatmap of features with underpricing
-# ---------------------------------------------------------------------------
-
-def fig_correlation_heatmap(df: pd.DataFrame) -> None:
-    feats = [
-        "underpricing", "winsorized_underpricing", "offer_price",
-        "vix_at_pricing", "nasdaq_30d_return", "nasdaq_30d_volatility",
-        "hot_market_dummy", "is_spac", "ipo_year",
-        "lm_negative_ratio", "lm_positive_ratio",
-        "lm_uncertainty_ratio", "lm_litigious_ratio",
-        "gunning_fog", "prospectus_uniqueness", "word_count",
+    fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+    colours = [
+        st.MUTED if name == "Unclassified" else st.OKABE_ITO["blue"]
+        for name in counts.index
     ]
-    feats = [c for c in feats if c in df.columns]
-    corr = df[feats].corr()
+    bars = ax.barh(counts.index, counts.to_numpy(), color=colours, height=0.72)
+    for bar, value in zip(bars, counts.to_numpy()):
+        ax.annotate(f"{value}", xy=(value, bar.get_y() + bar.get_height() / 2),
+                    xytext=(5, 0), textcoords="offset points", va="center",
+                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(corr, annot=True, fmt=".2f", cmap="RdBu_r", center=0,
-                vmin=-1, vmax=1, linewidths=0.4, ax=ax,
-                cbar_kws={"label": "Pearson correlation"})
-    ax.set_title("Correlation matrix — underpricing & features")
-    save(fig, "10_correlation_heatmap.png")
+    ax.set_xlabel("IPOs in the analysis sample (count)")
+    ax.set_xlim(0, counts.max() * 1.12)
+    ax.grid(axis="x")
+    ax.grid(axis="y", visible=False)
+
+    st.callout(
+        ax,
+        f"{unclassified} rows have no SEC-assigned SIC code.\n"
+        "They are labelled Unclassified, not folded\ninto a bucket to hide the gap.",
+        xy=(unclassified, list(counts.index).index("Unclassified")),
+        xytext=(counts.max() * 0.42, 2.0),
+    )
+
+    st.titles(
+        fig,
+        "Healthcare and Technology dominate the sample; nothing is a fallback bucket",
+        f"Sector from the registrant's SEC-assigned SIC code via a committed crosswalk. "
+        f"n = {len(df)} IPOs, {len(df) - unclassified} classified ({1 - unclassified / len(df):.1%}).",
+    )
+    return st.finish(fig, out / "02_sector_composition.svg",
+                     source="Source: SEC company submissions API (sic field); "
+                            "data/external/sic_gics_crosswalk.csv.",
+                     as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
-# Figure 11 — Litigious-tone paradox  (the H7 highlight)
+# 03 Sector x year median return
 # ---------------------------------------------------------------------------
 
-def fig_litigious_paradox(df: pd.DataFrame) -> None:
-    """Two-panel figure illustrating the counter-intuitive H7 finding.
+def fig_sector_year(df: pd.DataFrame, out: Path) -> Path:
+    pivot_median = df.pivot_table(index="sector", columns="ipo_year",
+                                  values="underpricing", aggfunc="median")
+    pivot_count = df.pivot_table(index="sector", columns="ipo_year",
+                                 values="underpricing", aggfunc="size")
+    order = pivot_count.sum(axis=1).sort_values(ascending=False).index
+    pivot_median, pivot_count = pivot_median.loc[order], pivot_count.loc[order]
 
-    Left panel: quintiles of LM litigious ratio vs. median first-day return
-    (Q1 = least legal language, Q5 = most).  The bars step DOWN from Q1 to
-    Q5 — the opposite of what the naive "more risk language → bigger pop"
-    intuition predicts.
+    thin = pivot_count.fillna(0) < MIN_CELL
+    shown = pivot_median.mask(thin)
 
-    Right panel: Spearman ρ between every LM category and the first-day
-    return on the same clean sample.  Litigious is the only category with
-    p < 0.01 and the only one with a clearly NEGATIVE coefficient, ruling
-    out "this is just a generic risk-language effect".
-    """
-    from scipy import stats as _stats
+    fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+    limit = float(np.nanmax(np.abs(shown.to_numpy()))) if shown.notna().any().any() else 1.0
+    mesh = ax.imshow(shown.to_numpy(), cmap=st.DIVERGING, aspect="auto",
+                     norm=st.diverging_norm(-limit, limit, 0.0))
 
-    base = df.dropna(subset=["lm_litigious_ratio", "underpricing"]).copy()
-    clean = base[base["underpricing"] > -0.5].copy()
-    n_clean = len(clean)
+    # Thin and empty cells are drawn grey so they cannot be read as a colour.
+    grey = np.where(thin.to_numpy() | pivot_median.isna().to_numpy(), 1.0, np.nan)
+    ax.imshow(grey, cmap="Greys", vmin=0, vmax=1.6, aspect="auto")
 
-    # Left panel — quintile bars
-    clean["lit_q"] = pd.qcut(
-        clean["lm_litigious_ratio"], 5,
-        labels=["Q1\nleast\nlitigious", "Q2", "Q3", "Q4", "Q5\nmost\nlitigious"],
-        duplicates="drop",
+    ax.set_xticks(range(len(pivot_median.columns)),
+                  [str(int(c)) for c in pivot_median.columns])
+    ax.set_yticks(range(len(pivot_median.index)), list(pivot_median.index))
+    ax.grid(visible=False)
+
+    for i in range(pivot_median.shape[0]):
+        for j in range(pivot_median.shape[1]):
+            count = pivot_count.iat[i, j]
+            if pd.isna(count) or count == 0:
+                continue
+            value = pivot_median.iat[i, j]
+            if thin.iat[i, j]:
+                label, colour = f"n={int(count)}", st.MUTED
+            else:
+                label = f"{value:+.0%}\nn={int(count)}"
+                colour = "white" if abs(value) > limit * 0.55 else st.INK
+            ax.text(j, i, label, ha="center", va="center",
+                    fontsize=st.SIZE_ANNOTATION - 1, color=colour)
+
+    bar = fig.colorbar(mesh, ax=ax, pad=0.015, fraction=0.035)
+    bar.set_label("Median first-day return (%)", fontsize=st.SIZE_LABEL)
+    bar.ax.yaxis.set_major_formatter(st.percent_formatter(0))
+
+    st.titles(
+        fig,
+        "The 2020-21 window is the only one where most sectors priced below market",
+        f"Median first-day return by sector and listing year; cell label shows the count. "
+        f"Cells with fewer than {MIN_CELL} IPOs are grey, not coloured. n = {len(df)}.",
     )
-    q_agg = (clean.groupby("lit_q", observed=True)["underpricing"]
-                  .agg(med="median", n="size").reset_index())
-    rho, sp_p = _stats.spearmanr(clean["lm_litigious_ratio"], clean["underpricing"])
-    kw_stat, kw_p = _stats.kruskal(
-        *[g["underpricing"].values for _, g in clean.groupby("lit_q", observed=True)]
-    )
+    return st.finish(fig, out / "03_sector_year_median_return.png",
+                     source=SOURCE_PRICES, as_of=AS_OF)
 
-    # Right panel — Spearman ρ for every LM category, same clean sample
-    lm_cols = [
+
+# ---------------------------------------------------------------------------
+# 04 Sentiment deciles
+# ---------------------------------------------------------------------------
+
+def _decile_medians(frame: pd.DataFrame, column: str, target: str, q: int = 10) -> pd.DataFrame:
+    frame = frame[[column, target]].dropna()
+    if len(frame) < q * 4:
+        return pd.DataFrame()
+    frame = frame.assign(_bin=pd.qcut(frame[column], q=q, labels=False, duplicates="drop"))
+    rows = []
+    for index, group in frame.groupby("_bin", observed=True):
+        point, low, high = st.bootstrap_ci(group[target].to_numpy())
+        rows.append({"bin": int(index) + 1, "n": len(group), "median": point,
+                     "ci_low": low, "ci_high": high,
+                     "x": float(group[column].median())})
+    return pd.DataFrame(rows)
+
+
+def fig_sentiment(df: pd.DataFrame, out: Path) -> Path:
+    categories = [
         ("lm_negative_ratio", "Negative"),
         ("lm_positive_ratio", "Positive"),
         ("lm_uncertainty_ratio", "Uncertainty"),
-        ("lm_constraining_ratio", "Constraining"),
         ("lm_litigious_ratio", "Litigious"),
     ]
-    rows = []
-    for col, label in lm_cols:
-        sub = clean.dropna(subset=[col])
-        r, p = _stats.spearmanr(sub[col], sub["underpricing"])
-        rows.append({"category": label, "rho": r, "p": p, "n": len(sub)})
-    summary = pd.DataFrame(rows).set_index("category")
-    summary = summary.reindex([lbl for _, lbl in lm_cols])
+    fig, axes = plt.subplots(2, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN), sharey=True)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7),
-                                    gridspec_kw={"width_ratios": [1.1, 1]})
+    for ax, (column, label) in zip(axes.ravel(), categories):
+        table = _decile_medians(df, column, "underpricing")
+        if table.empty:
+            ax.set_visible(False)
+            continue
+        ax.errorbar(
+            table["bin"], table["median"],
+            yerr=[table["median"] - table["ci_low"], table["ci_high"] - table["median"]],
+            fmt="o-", color=st.OKABE_ITO["blue"], ecolor=st.OKABE_ITO["sky"],
+            elinewidth=1.6, capsize=3, markersize=5,
+        )
+        ax.axhline(0, color=st.MUTED, linewidth=0.9)
+        rho, low, high = st.spearman_ci(df[column], df["underpricing"])
+        ax.set_title(f"{label}   rho = {rho:+.3f} [{low:+.2f}, {high:+.2f}]",
+                     fontsize=st.SIZE_SUBTITLE + 1)
+        ax.set_xlabel(f"{label}-word ratio, decile (1 = lowest)")
+        ax.yaxis.set_major_formatter(st.percent_formatter(0))
+        ax.set_xticks(range(1, 11))
+        n_per = int(table["n"].median())
+        ax.annotate(f"n = {n_per} per decile", xy=(0.98, 0.04), xycoords="axes fraction",
+                    ha="right", fontsize=st.SIZE_FOOTER, color=st.MUTED)
 
-    # --- Left: quintile bars -------------------------------------------------
-    # Keep the title to ONE short plain-language line; the heavy statistics go
-    # into a tidy box inside the panel (upper-right, where the bars are short)
-    # so no long line of numbers spills across into the right-hand panel.
-    bar_colors = ["#94a3b8", "#94a3b8", "#94a3b8", "#94a3b8", ACCENT]
-    bars = ax1.bar(q_agg["lit_q"].astype(str), q_agg["med"] * 100,
-                   color=bar_colors, edgecolor="white")
-    ax1.axhline(0, color=NEUTRAL, lw=0.7)
-    ax1.set_ylabel("Median first-day return (%)")
-    ax1.set_title("Most-litigious IPOs pop the LEAST", fontsize=12, pad=10)
-    max_h = float((q_agg["med"] * 100).max())
-    ax1.set_ylim(0, max_h * 1.30)
-    for bar, n_q in zip(bars, q_agg["n"]):
-        h = bar.get_height()
-        ax1.text(bar.get_x() + bar.get_width() / 2, h + max_h * 0.03,
-                 f"{h:+.1f}%\n(n={int(n_q)})", ha="center", va="bottom",
-                 fontsize=9)
-    ax1.set_xlabel("Amount of legal / litigious language in the S-1\n"
-                   "(quintiles: Q1 = least, Q5 = most)")
+    axes[0, 0].set_ylabel("Median first-day return (%)")
+    axes[1, 0].set_ylabel("Median first-day return (%)")
 
-    # --- Right: Spearman-rho comparison across all tone categories -----------
-    # Numeric labels always sit at the far right so they never collide with the
-    # category names that sit at x = 0.
-    colors = ["#94a3b8" if c != "Litigious" else ACCENT for c in summary.index]
-    bars2 = ax2.barh(summary.index, summary["rho"], color=colors, edgecolor="white")
-    ax2.axvline(0, color=NEUTRAL, lw=0.7)
-    ax2.set_xlabel("Correlation (Spearman rho) with first-day return")
-    ax2.set_title("Litigious is the only tone with a real\nnegative link to the pop",
-                  fontsize=12, pad=10)
-    # Reserve a wide blank strip on the right for a tidy label column. x_hi is
-    # pushed well past the longest bar so the right-aligned labels never touch
-    # any bar. label_x marks where that column lives.
-    x_lo = min(-0.33, summary["rho"].min() - 0.10)
-    x_hi = max(0.78, summary["rho"].max() + 0.55)
-    label_x = x_hi - 0.02
-    ax2.set_xlim(x_lo, x_hi)
-    # Light divider between the bars and the label column.
-    ax2.axvline(summary["rho"].max() + 0.10, color="#e2e8f0", lw=1)
-    for bar, (cat, row) in zip(bars2, summary.iterrows()):
-        x = bar.get_width()
-        sig = "***" if row["p"] < 0.001 else ("**" if row["p"] < 0.01
-              else ("*" if row["p"] < 0.05 else ""))
-        ax2.text(label_x, bar.get_y() + bar.get_height() / 2,
-                 f"rho = {x:+.3f}    p = {row['p']:.2g} {sig}",
-                 ha="right", va="center", fontsize=9, color=NEUTRAL)
-
-    # All free text lives OUTSIDE the two plotting axes: a headline + explainer
-    # in the reserved top band, and the statistics in a caption strip along the
-    # bottom. tight_layout's rect keeps the axes between them so nothing can
-    # crash into the charts.
-    fig.suptitle("The Litigious-Tone Paradox", fontsize=16,
-                 fontweight="bold", y=0.985)
-    fig.text(
-        0.5, 0.905,
-        "More legal / litigious language in the prospectus predicts a SMALLER "
-        "first-day pop —\nthe opposite of the naive \"more risk talk → bigger "
-        "pop\" intuition.",
-        ha="center", va="top", fontsize=11, color=NEUTRAL,
+    n = int(df["lm_litigious_ratio"].notna().sum())
+    st.titles(
+        fig,
+        "No Loughran-McDonald tone category orders the first-day return",
+        f"Median first-day return by decile of each tone ratio, with 95% bootstrap "
+        f"intervals (5,000 resamples). n = {n} IPOs with a recovered prospectus.",
     )
-    fig.text(
-        0.5, 0.035,
-        f"Spearman rho = {rho:+.3f}  (p = {sp_p:.1g})      ·      "
-        f"Kruskal-Wallis H = {kw_stat:.1f}  (p = {kw_p:.1g})      ·      "
-        f"n = {n_clean} IPOs      ·      "
-        "significance:  * p<0.05   ** p<0.01   *** p<0.001",
-        ha="center", va="center", fontsize=9.5, color=NEUTRAL,
-    )
-    fig.tight_layout(rect=[0, 0.08, 1, 0.82])
-    save(fig, "11_litigious_paradox.png")
+    return st.finish(fig, out / "04_tone_deciles.svg", source=SOURCE_TEXT, as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
-# Figure 12 — Disclosure Concentration Curse (H3)
+# 05 VIX and dispersion
 # ---------------------------------------------------------------------------
 
-def fig_disclosure_concentration(df: pd.DataFrame) -> None:
-    """Three-panel figure for H3: where the negative tone lives matters.
-
-    Left:   tercile bars (T1_pervasive / T2_mid / T3_compartmentalised) showing
-            median first-day return by risk_concentration_ratio tercile.
-    Middle: scatter of risk_concentration_ratio vs first-day return for the
-            BULK of the sample (return ≤ 200%), with a quintile-median line.
-    Right:  the handful of >200% "moonshot" IPOs broken out on their own axis
-            so they don't blow out the y-scale of the main scatter.
-    """
-    from scipy import stats as _stats
-
-    base = df.dropna(subset=["rf_lm_negative_ratio", "lm_negative_ratio",
-                              "underpricing"]).copy()
-    base = base[base["lm_negative_ratio"] > 0].copy()
-    base["risk_concentration_ratio"] = (
-        base["rf_lm_negative_ratio"] / base["lm_negative_ratio"]
-    )
-    clean = base[base["underpricing"] > -0.5].copy()
-    n_clean = len(clean)
-
-    rho, sp_p = _stats.spearmanr(
-        clean["risk_concentration_ratio"], clean["underpricing"]
+def fig_vix(df: pd.DataFrame, out: Path) -> Path:
+    frame = df[["vix_at_pricing", "underpricing"]].dropna()
+    frame = frame.assign(
+        tercile=pd.qcut(frame["vix_at_pricing"], q=3, labels=["Low VIX", "Mid VIX", "High VIX"])
     )
 
-    # Tercile split
-    clean["_tercile"] = pd.qcut(
-        clean["risk_concentration_ratio"], q=3,
-        labels=["T1\npervasive", "T2\nmid", "T3\ncompart-\nmentalised"],
-        duplicates="drop",
-    )
-    t_agg = (clean.groupby("_tercile", observed=True)["underpricing"]
-                  .agg(med="median", n="size").reset_index())
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
 
-    kw_stat, kw_p = _stats.kruskal(
-        *[g["underpricing"].values
-          for _, g in clean.groupby("_tercile", observed=True)]
+    table = _decile_medians(frame, "vix_at_pricing", "underpricing")
+    ax_left.errorbar(
+        table["x"], table["median"],
+        yerr=[table["median"] - table["ci_low"], table["ci_high"] - table["median"]],
+        fmt="o-", color=st.OKABE_ITO["blue"], ecolor=st.OKABE_ITO["sky"],
+        elinewidth=1.6, capsize=3, markersize=5,
     )
+    ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
+    ax_left.set_title("The level does not move with VIX", fontsize=st.SIZE_SUBTITLE + 1)
+    ax_left.set_xlabel("VIX close on the trading day before listing (index points)")
+    ax_left.set_ylabel("Median first-day return (%)")
+    ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
 
-    # Split the scatter at a 200% first-day return so the dense bulk of the
-    # sample and the few extreme "moonshots" each get a readable y-axis.
-    SPLIT = 2.0
-    main = clean[clean["underpricing"] <= SPLIT].copy()
-    moon = clean[clean["underpricing"] > SPLIT].copy()
-    print(
-        f"  disclosure plot: {len(main):,} IPOs at ≤200% first-day return, "
-        f"{len(moon):,} moonshots >200% broken out separately"
+    labels, spreads, counts = [], [], []
+    for label, group in frame.groupby("tercile", observed=True):
+        values = group["underpricing"].to_numpy()
+        labels.append(str(label))
+        spreads.append(float(np.percentile(values, 75) - np.percentile(values, 25)))
+        counts.append(len(values))
+
+    bars = ax_right.bar(labels, spreads, color=st.OKABE_ITO["orange"], width=0.55)
+    for bar, spread, count in zip(bars, spreads, counts):
+        ax_right.annotate(f"{spread:.1%}\nn = {count}",
+                          xy=(bar.get_x() + bar.get_width() / 2, spread),
+                          xytext=(0, 5), textcoords="offset points", ha="center",
+                          fontsize=st.SIZE_ANNOTATION, color=st.INK)
+    ax_right.set_title("The dispersion does", fontsize=st.SIZE_SUBTITLE + 1)
+    ax_right.set_xlabel("VIX tercile on the day before listing")
+    ax_right.set_ylabel("Interquartile range of the first-day return (%)")
+    ax_right.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_right.set_ylim(0, max(spreads) * 1.25)
+
+    st.titles(
+        fig,
+        "Volatility widens the spread of first-day returns without shifting their centre",
+        f"n = {len(frame)}. Left: decile medians with 95% bootstrap intervals. "
+        "Right: interquartile range by VIX tercile (Fligner-Killeen p < 1e-8).",
     )
-
-    fig, (ax1, ax2, ax3) = plt.subplots(
-        1, 3, figsize=(17, 6.6),
-        gridspec_kw={"width_ratios": [1, 1.35, 0.85]},
-    )
-
-    # --- Left panel: tercile bars -------------------------------------------
-    bar_colors = [ACCENT, NEUTRAL, PRIMARY]
-    bars = ax1.bar(t_agg["_tercile"].astype(str), t_agg["med"] * 100,
-                   color=bar_colors, edgecolor="white")
-    ax1.axhline(0, color=NEUTRAL, lw=0.7)
-    ax1.set_ylabel("Median first-day return (%)")
-    ax1.set_xlabel("Risk-concentration tercile\n"
-                   "(risk-factor negative tone ÷ whole-document negative tone)")
-    ax1.set_title(
-        "Median first-day return by\ndisclosure-concentration tercile\n"
-        f"Kruskal-Wallis H = {kw_stat:.1f}  (p = {kw_p:.4g}),  n = {n_clean}",
-        fontsize=11, pad=12,
-    )
-    max_h = float((t_agg["med"] * 100).max())
-    ax1.set_ylim(0, max_h * 1.35)
-    for bar, row in zip(bars, t_agg.itertuples()):
-        h = bar.get_height()
-        ax1.text(bar.get_x() + bar.get_width() / 2, h + max_h * 0.03,
-                 f"{h:+.1f}%\n(n={int(row.n)})", ha="center", va="bottom",
-                 fontsize=9)
-
-    # --- Middle panel: main scatter (return ≤ 200%) + quintile median -------
-    ax2.scatter(main["risk_concentration_ratio"], main["underpricing"],
-                s=16, alpha=0.30, color=NEUTRAL, label="IPOs (≤200% return)")
-
-    main["_t"] = pd.qcut(main["risk_concentration_ratio"], 5,
-                         duplicates="drop")
-    tline = (main.groupby("_t", observed=True)
-                 .agg(x=("risk_concentration_ratio", "mean"),
-                      med=("underpricing", "median"))
-                 .reset_index())
-    ax2.plot(tline["x"], tline["med"], color=PRIMARY, lw=2.8,
-             marker="o", markersize=8, label="Quintile median trend")
-    ax2.axhline(0, color=NEUTRAL, ls="--", lw=0.7)
-    ax2.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-    ax2.set_ylim(-0.6, SPLIT + 0.05)
-    ax2.set_xlabel("Risk-concentration ratio  (higher → negative tone is\n"
-                   "compartmentalised in the Risk Factors section)")
-    ax2.set_ylabel("First-day return")
-    ax2.set_title(
-        f"Bulk of the sample — first-day return ≤ 200%  (n = {len(main):,})\n"
-        f"Spearman rho = {rho:+.3f}  (p = {sp_p:.4g}, full clean sample)",
-        fontsize=11, pad=12,
-    )
-    ax2.legend(loc="upper right", fontsize=9, frameon=True)
-
-    # --- Right panel: moonshots (return > 200%) -----------------------------
-    ax3.scatter(moon["risk_concentration_ratio"], moon["underpricing"],
-                s=36, alpha=0.75, color=ACCENT, edgecolor="white",
-                label=f"IPOs >200% return (n = {len(moon):,})")
-    ax3.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))
-    if len(moon):
-        ax3.set_ylim(SPLIT * 0.95, moon["underpricing"].max() * 1.08)
-    ax3.set_xlabel("Risk-concentration ratio")
-    ax3.set_ylabel("First-day return")
-    ax3.set_title(
-        "Moonshots broken out\nfirst-day return > 200%",
-        fontsize=11, pad=12,
-    )
-    ax3.legend(loc="upper right", fontsize=9, frameon=True)
-
-    fig.suptitle(
-        "H3 — Disclosure Concentration Curse:  where the negative tone lives matters\n"
-        "Pervasive negative tone across the whole prospectus → higher underpricing;  "
-        "compartmentalised negative tone (Risk Factors only) → lower underpricing",
-        fontsize=12.5, y=0.99,
-    )
-    # rect top = 0.85 keeps the two-line suptitle clear of the panel titles.
-    fig.tight_layout(rect=[0, 0, 1, 0.85])
-    save(fig, "12_disclosure_concentration.png")
+    return st.finish(fig, out / "05_vix_and_dispersion.svg", source=SOURCE_PRICES, as_of=AS_OF)
 
 
 # ---------------------------------------------------------------------------
-# Main
+# 06 Correlation heatmap
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    print("Loading data …")
-    df = load_data()
-    print(f"  n = {len(df):,} IPOs;  {df['sector'].nunique()} sectors")
+def fig_correlations(df: pd.DataFrame, out: Path) -> Path:
+    columns = [
+        "underpricing", "log_offer_price", "log_offer_size", "max_underwriter_rank",
+        "vix_at_pricing", "nasdaq_30d_return", "nasdaq_30d_volatility", "hot_market_dummy",
+        "lm_negative_ratio", "lm_positive_ratio", "lm_uncertainty_ratio",
+        "lm_litigious_ratio", "risk_concentration_ratio", "gunning_fog",
+        "prospectus_uniqueness", "log_prospectus_words",
+    ]
+    columns = [c for c in columns if c in df.columns]
+    corr = df[columns].corr(method="pearson")
 
-    print("\nGenerating figures:")
-    fig_underpricing_dist(df)
-    fig_sector_counts(df)
-    fig_sector_year_heatmap(df)
-    fig_sentiment_vs_underpricing(df)
-    fig_vix_scatter(df)
-    fig_correlation_heatmap(df)
-    fig_litigious_paradox(df)
-    fig_disclosure_concentration(df)
-    print("\nDone. Figures in:", FIG_DIR.relative_to(ROOT))
+    # Order by hierarchical clustering so related blocks sit together, but keep
+    # underpricing first: it is the only row anyone reads.
+    from scipy.cluster.hierarchy import leaves_list, linkage
+    from scipy.spatial.distance import squareform
+
+    others = [c for c in columns if c != "underpricing"]
+    distance = 1 - corr.loc[others, others].abs().to_numpy()
+    np.fill_diagonal(distance, 0.0)
+    ordered = [others[i] for i in leaves_list(linkage(squareform(distance, checks=False),
+                                                      method="average"))]
+    order = ["underpricing", *ordered]
+    corr = corr.loc[order, order]
+
+    mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
+    shown = corr.mask(mask)
+
+    fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+    mesh = ax.imshow(shown.to_numpy(), cmap=st.DIVERGING,
+                     norm=st.diverging_norm(-1.0, 1.0, 0.0), aspect="auto")
+    ax.set_xticks(range(len(order)), order, rotation=45, ha="right", fontsize=st.SIZE_FOOTER)
+    ax.set_yticks(range(len(order)), order, fontsize=st.SIZE_FOOTER)
+    ax.grid(visible=False)
+
+    for i in range(len(order)):
+        for j in range(i + 1):
+            value = corr.iat[i, j]
+            ax.text(j, i, f"{value:.2f}", ha="center", va="center",
+                    fontsize=st.SIZE_FOOTER - 1,
+                    color="white" if abs(value) > 0.55 else st.INK)
+
+    ax.add_patch(plt.Rectangle((-0.5, -0.5), len(order), 1, fill=False,
+                               edgecolor=st.OKABE_ITO["vermillion"], linewidth=2.2))
+    strongest = corr.loc["underpricing"].drop("underpricing").abs().max()
+
+    bar = fig.colorbar(mesh, ax=ax, pad=0.015, fraction=0.035)
+    bar.set_label("Pearson correlation", fontsize=st.SIZE_LABEL)
+
+    st.titles(
+        fig,
+        f"Nothing correlates with the first-day return above |{strongest:.2f}|",
+        f"Pearson correlations on pairwise-complete observations, n up to {len(df)}. "
+        "Upper triangle masked; features ordered by hierarchical clustering. "
+        "The boxed row is the target.",
+    )
+    return st.finish(fig, out / "06_feature_correlations.svg", source=SOURCE_TEXT, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 07 Litigious quintiles, the former headline
+# ---------------------------------------------------------------------------
+
+def fig_litigious(df: pd.DataFrame, out: Path) -> Path:
+    quintiles = pd.read_csv(TABLES / "h1_quintiles.csv")
+    robustness = pd.read_csv(TABLES / "h1_robustness.csv")
+    subsample = df[df["split_adjusted"] == 0]
+
+    clean_rows = []
+    frame = subsample[["lm_litigious_ratio", "underpricing"]].dropna()
+    if len(frame) >= 50:
+        frame = frame.assign(
+            _bin=pd.qcut(frame["lm_litigious_ratio"], q=5,
+                         labels=[f"Q{i}" for i in range(1, 6)], duplicates="drop")
+        )
+        for label, group in frame.groupby("_bin", observed=True):
+            point, low, high = st.bootstrap_ci(group["underpricing"].to_numpy())
+            clean_rows.append({"quintile": str(label), "n": len(group),
+                               "median": point, "ci_low": low, "ci_high": high})
+    clean = pd.DataFrame(clean_rows)
+
+    fig, (ax_left, ax_right) = plt.subplots(
+        1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
+        gridspec_kw={"width_ratios": [1.15, 1]},
+    )
+
+    positions = np.arange(len(quintiles))
+    width = 0.38
+    ax_left.bar(positions - width / 2, quintiles["median"], width=width,
+                color=st.OKABE_ITO["blue"], label="All filings")
+    ax_left.errorbar(positions - width / 2, quintiles["median"],
+                     yerr=[quintiles["median"] - quintiles["ci_low"],
+                           quintiles["ci_high"] - quintiles["median"]],
+                     fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+    if not clean.empty:
+        ax_left.bar(positions + width / 2, clean["median"], width=width,
+                    color=st.OKABE_ITO["orange"], hatch="//",
+                    label="Excluding split-corrected prices")
+        ax_left.errorbar(positions + width / 2, clean["median"],
+                         yerr=[clean["median"] - clean["ci_low"],
+                               clean["ci_high"] - clean["median"]],
+                         fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+
+    headroom = float(max(quintiles["ci_high"].max(),
+                         clean["ci_high"].max() if not clean.empty else 0))
+    for x, row in zip(positions, quintiles.itertuples()):
+        ax_left.annotate(f"n = {row.n}", xy=(x, headroom), xytext=(0, 16),
+                         textcoords="offset points", ha="center",
+                         fontsize=st.SIZE_FOOTER, color=st.MUTED)
+    ax_left.set_ylim(0, headroom * 1.30)
+
+    ax_left.set_xticks(positions, quintiles["quintile"])
+    ax_left.set_xlabel("Litigious-word ratio, quintile (Q1 = least legal language)")
+    ax_left.set_ylabel("Median first-day return (%)")
+    ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
+    ax_left.legend(loc="upper center", ncol=2, bbox_to_anchor=(0.5, -0.13))
+    ax_left.set_title("Medians by quintile, with 95% bootstrap intervals",
+                      fontsize=st.SIZE_SUBTITLE + 1)
+
+    specs = robustness[robustness["kind"] == "spearman"].dropna(subset=["estimate"])
+    specs = specs.iloc[::-1]
+    y = np.arange(len(specs))
+    ax_right.errorbar(
+        specs["estimate"], y,
+        xerr=[specs["estimate"] - specs["ci_low"], specs["ci_high"] - specs["estimate"]],
+        fmt="o", color=st.OKABE_ITO["blue"], ecolor=st.MUTED,
+        elinewidth=1.4, capsize=3, markersize=5,
+    )
+    ax_right.axvline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.4)
+    ax_right.set_yticks(y, [f"{s}  (n={n})" for s, n in zip(specs["specification"], specs["n"])],
+                        fontsize=st.SIZE_FOOTER)
+    ax_right.set_xlabel("Spearman rho with the first-day return")
+    ax_right.grid(axis="x")
+    ax_right.grid(axis="y", visible=False)
+    ax_right.set_title("Every subsample interval spans zero", fontsize=st.SIZE_SUBTITLE + 1)
+
+    st.titles(
+        fig,
+        "The litigious-tone effect does not survive a correct first-day return",
+        f"Spearman rho = {robustness['estimate'].iloc[0]:+.3f} "
+        f"(95% CI [{robustness['ci_low'].iloc[0]:+.3f}, {robustness['ci_high'].iloc[0]:+.3f}], "
+        f"p = {robustness['p_value'].iloc[0]:.2f}) on n = {int(robustness['n'].iloc[0])} "
+        "IPOs with a recovered prospectus.",
+    )
+    return st.finish(fig, out / "07_litigious_tone.svg", source=SOURCE_TEXT, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 08 Disclosure concentration
+# ---------------------------------------------------------------------------
+
+def fig_disclosure(df: pd.DataFrame, out: Path) -> Path:
+    terciles = pd.read_csv(TABLES / "h3_terciles.csv")
+    frame = df[["risk_concentration_ratio", "underpricing"]].dropna()
+    frame = frame[np.isfinite(frame["risk_concentration_ratio"])]
+
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+
+    positions = np.arange(len(terciles))
+    ax_left.bar(positions, terciles["median"], width=0.55, color=st.OKABE_ITO["green"])
+    ax_left.errorbar(positions, terciles["median"],
+                     yerr=[terciles["median"] - terciles["ci_low"],
+                           terciles["ci_high"] - terciles["median"]],
+                     fmt="none", ecolor=st.INK, elinewidth=1.4, capsize=4)
+    tercile_headroom = float(terciles["ci_high"].max())
+    for x, row in zip(positions, terciles.itertuples()):
+        ax_left.annotate(f"n = {row.n}", xy=(x, tercile_headroom), xytext=(0, 14),
+                         textcoords="offset points", ha="center",
+                         fontsize=st.SIZE_FOOTER, color=st.MUTED)
+    ax_left.set_ylim(0, tercile_headroom * 1.28)
+    ax_left.set_xticks(positions, [t.replace(" ", "\n", 1) for t in terciles["tercile"]])
+    ax_left.set_ylabel("Median first-day return (%)")
+    ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_left.axhline(0, color=st.MUTED, linewidth=0.9)
+    ax_left.set_title("Medians overlap across terciles", fontsize=st.SIZE_SUBTITLE + 1)
+
+    ax_right.scatter(frame["risk_concentration_ratio"], frame["underpricing"],
+                     s=14, alpha=0.45, color=st.OKABE_ITO["blue"], edgecolors="none")
+    ax_right.set_yscale("symlog", linthresh=1)
+    ax_right.set_xlabel("Risk-factor share of prospectus negative tone (ratio)")
+    ax_right.set_ylabel("First-day return (%, log scale)")
+    ax_right.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_right.axhline(0, color=st.MUTED, linewidth=0.9)
+    ax_right.minorticks_on()
+    ax_right.set_title("and the scatter shows no slope", fontsize=st.SIZE_SUBTITLE + 1)
+
+    rho, low, high = st.spearman_ci(frame["risk_concentration_ratio"], frame["underpricing"])
+    st.titles(
+        fig,
+        "Where negative tone sits in the prospectus does not predict the first-day return",
+        f"Spearman rho = {rho:+.3f} (95% CI [{low:+.3f}, {high:+.3f}]) on n = {len(frame)}. "
+        "Bars show 95% bootstrap intervals on each tercile median.",
+    )
+    return st.finish(fig, out / "08_disclosure_concentration.png",
+                     source=SOURCE_TEXT, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 09 Model performance
+# ---------------------------------------------------------------------------
+
+def fig_models(out: Path) -> Path:
+    per_fold = pd.read_csv(TABLES / "model_cv_per_fold.csv")
+    summary = pd.read_csv(TABLES / "model_cv_summary.csv")
+
+    fig, (ax_left, ax_right) = plt.subplots(
+        1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN),
+        gridspec_kw={"width_ratios": [1, 1.25]},
+    )
+
+    order = summary.sort_values("r2_mean")["model"].tolist()
+    y = np.arange(len(order))
+    means = [summary.loc[summary["model"] == m, "r2_mean"].iloc[0] for m in order]
+    colours = [
+        st.OKABE_ITO["green"] if m.startswith("Baseline") else st.OKABE_ITO["blue"]
+        for m in order
+    ]
+    ax_left.barh(y, means, color=colours, height=0.6)
+    for yi, model in zip(y, order):
+        low = per_fold.loc[per_fold["model"] == model, "r2"].min()
+        high = per_fold.loc[per_fold["model"] == model, "r2"].max()
+        ax_left.plot([low, high], [yi, yi], color=st.INK, linewidth=1.4)
+        ax_left.plot([low, high], [yi, yi], "|", color=st.INK, markersize=7)
+    ax_left.axvline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.6)
+    ax_left.set_yticks(y, order, fontsize=st.SIZE_ANNOTATION)
+    ax_left.set_xlabel("Out-of-sample R-squared (mean across folds; bar spans fold min to max)")
+    ax_left.grid(axis="x")
+    ax_left.grid(axis="y", visible=False)
+    ax_left.set_title("Every model is worse than predicting the training median",
+                      fontsize=st.SIZE_SUBTITLE + 1)
+    ax_left.annotate("R² = 0 means\n'as good as the\ntraining mean'",
+                     xy=(0, len(order) - 0.5), xytext=(4, -6), textcoords="offset points",
+                     fontsize=st.SIZE_FOOTER, color=st.OKABE_ITO["vermillion"])
+
+    models = [m for m in summary["model"] if not m.startswith("Baseline")]
+    for colour, model in zip(st.QUALITATIVE, sorted(models)):
+        rows = per_fold[per_fold["model"] == model].sort_values("fold")
+        ax_right.plot(rows["fold"], rows["r2"], "o-", color=colour, markersize=5)
+        st.direct_label(ax_right, rows["fold"].iloc[-1], rows["r2"].iloc[-1], f"  {model}", colour)
+    baseline = per_fold[per_fold["model"] == "Baseline: train median"].sort_values("fold")
+    ax_right.plot(baseline["fold"], baseline["r2"], "--", color=st.MUTED, linewidth=1.6)
+    st.direct_label(ax_right, baseline["fold"].iloc[0], baseline["r2"].iloc[0],
+                    "median baseline  ", st.MUTED, ha="right")
+
+    ax_right.axhline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.2)
+    ax_right.set_xticks(sorted(per_fold["fold"].unique()))
+    ax_right.set_xlabel("Expanding-window fold (1 = earliest listings)")
+    ax_right.set_ylabel("Out-of-sample R-squared")
+    ax_right.set_xlim(0.6, per_fold["fold"].max() + 1.1)
+    ax_right.set_title("Fold-to-fold variation dwarfs the average",
+                       fontsize=st.SIZE_SUBTITLE + 1)
+
+    n_train = int(per_fold["n_train"].max())
+    n_test = int(per_fold["n_test"].max())
+    st.titles(
+        fig,
+        "First-day IPO returns are not forecastable from pre-listing information",
+        f"Five-fold expanding-window TimeSeriesSplit; final fold trains on {n_train} "
+        f"listings and tests on {n_test}. Hyperparameters chosen by an inner split "
+        "on the training fold only.",
+    )
+    return st.finish(fig, out / "09_model_performance.svg", source=SOURCE_MODELS, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 10 Holdout predictions and residuals
+# ---------------------------------------------------------------------------
+
+def fig_holdout(df: pd.DataFrame, out: Path) -> Path:
+    from src.models import holdout_evaluation
+
+    metrics, predictions, test = holdout_evaluation(df)
+    actual = test["underpricing"].to_numpy(dtype=float)
+    predicted = predictions["LightGBM"]
+    residuals = actual - predicted
+    r2 = float(metrics.loc[metrics["model"] == "LightGBM", "r2"].iloc[0])
+
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+
+    ax_left.scatter(predicted, actual, s=22, alpha=0.6,
+                    color=st.OKABE_ITO["blue"], edgecolors="none")
+    limit = float(max(np.abs(actual).max(), np.abs(predicted).max())) * 1.08
+    ax_left.plot([-limit, limit], [-limit, limit], color=st.OKABE_ITO["vermillion"],
+                 linewidth=1.5, linestyle="--")
+    ax_left.set_xlim(-limit, limit)
+    ax_left.set_ylim(-limit, limit)
+    ax_left.set_xlabel("Predicted first-day return (%)")
+    ax_left.set_ylabel("Actual first-day return (%)")
+    ax_left.xaxis.set_major_formatter(st.percent_formatter(0))
+    ax_left.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_left.grid(axis="both")
+    ax_left.set_title(f"Predictions cluster near the mean (R² = {r2:.2f})",
+                      fontsize=st.SIZE_SUBTITLE + 1)
+    ax_left.legend(handles=[Line2D([], [], color=st.OKABE_ITO["vermillion"],
+                                   linestyle="--", label="perfect prediction")],
+                   loc="upper left")
+
+    ax_right.scatter(pd.to_datetime(test["ipo_date"]), residuals, s=22, alpha=0.6,
+                     color=st.OKABE_ITO["orange"], edgecolors="none")
+    ax_right.axhline(0, color=st.OKABE_ITO["vermillion"], linewidth=1.4)
+    ax_right.set_xlabel("Listing date")
+    ax_right.set_ylabel("Residual, actual minus predicted (%)")
+    ax_right.yaxis.set_major_formatter(st.percent_formatter(0))
+    ax_right.set_title("Residuals are as large as the returns themselves",
+                       fontsize=st.SIZE_SUBTITLE + 1)
+    fig.autofmt_xdate(rotation=30)
+
+    st.titles(
+        fig,
+        "On unseen 2024 listings the model adds nothing over a constant",
+        f"Trained on {int(metrics['n_train'].iloc[0])} listings before 2024-01-01, "
+        f"scored on {int(metrics['n_test'].iloc[0])} listings after it. "
+        "LightGBM; the training-median baseline scores R² = "
+        f"{float(metrics.loc[metrics['model'] == 'Baseline: train median', 'r2'].iloc[0]):.3f}.",
+    )
+    return st.finish(fig, out / "10_holdout_predictions.svg",
+                     source=SOURCE_MODELS, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 11 SHAP
+# ---------------------------------------------------------------------------
+
+def fig_shap(out: Path) -> Path:
+    importance = pd.read_csv(TABLES / "shap_importance.csv").head(12).iloc[::-1]
+    labels = [
+        f.replace("numeric__", "").replace("categorical__", "")
+        for f in importance["feature"]
+    ]
+
+    fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+    y = np.arange(len(importance))
+    bars = ax.barh(y, importance["mean_abs_shap"], color=st.OKABE_ITO["purple"], height=0.66)
+    for bar, value in zip(bars, importance["mean_abs_shap"]):
+        ax.annotate(f"{value:.3f}", xy=(value, bar.get_y() + bar.get_height() / 2),
+                    xytext=(5, 0), textcoords="offset points", va="center",
+                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
+    ax.set_yticks(y, labels, fontsize=st.SIZE_ANNOTATION)
+    ax.set_xlabel("Mean |SHAP value| (percentage points of predicted first-day return)")
+    ax.set_xlim(0, importance["mean_abs_shap"].max() * 1.16)
+    ax.grid(axis="x")
+    ax.grid(axis="y", visible=False)
+
+    st.callout(
+        ax,
+        "This ranks what the model leaned on.\n"
+        "That model has negative out-of-sample R².\n"
+        "It is not evidence about what drives underpricing.",
+        xy=(importance["mean_abs_shap"].iloc[-1], len(importance) - 1),
+        xytext=(importance["mean_abs_shap"].max() * 0.42, len(importance) - 5.0),
+    )
+
+    st.titles(
+        fig,
+        "The model keys on market regime and deal size, not on prospectus text",
+        "Mean absolute SHAP value, LightGBM fitted on all 709 listings for inspection only. "
+        "Market-regime features lead; every tone ratio ranks below them.",
+    )
+    return st.finish(fig, out / "11_shap_importance.svg", source=SOURCE_MODELS, as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+# 12 Sample funnel
+# ---------------------------------------------------------------------------
+
+def fig_funnel(out: Path) -> Path:
+    full = pd.read_csv(TABLES / "sample_funnel.csv")
+    # Steps that remove nothing add a bar without adding information.
+    funnel = full[(full["dropped"] > 0) | (full.index == 0)].reset_index(drop=True)
+
+    fig, ax = plt.subplots(figsize=(st.FIG_WIDTH_IN, st.FIG_HEIGHT_IN))
+    y = np.arange(len(funnel))[::-1]
+    bars = ax.barh(y, funnel["n"], color=st.OKABE_ITO["blue"], height=0.62)
+    for bar, row in zip(bars, funnel.itertuples()):
+        ax.annotate(f"{row.n:,}   ({row.pct_of_universe:.0f}% of the calendar)",
+                    xy=(row.n, bar.get_y() + bar.get_height() / 2),
+                    xytext=(6, 0), textcoords="offset points", va="center",
+                    fontsize=st.SIZE_ANNOTATION, color=st.INK)
+        if row.dropped:
+            ax.annotate(f"-{row.dropped:,}",
+                        xy=(row.n, bar.get_y() + bar.get_height()),
+                        xytext=(-6, 6), textcoords="offset points", va="center", ha="right",
+                        fontsize=st.SIZE_FOOTER, color=st.OKABE_ITO["vermillion"])
+
+    ax.set_yticks(y, funnel["step"], fontsize=st.SIZE_ANNOTATION)
+    ax.set_xlabel("IPOs remaining (count)")
+    ax.set_xlim(0, funnel["n"].max() * 1.42)
+    ax.grid(axis="x")
+    ax.grid(axis="y", visible=False)
+
+    biggest = int(funnel["dropped"].idxmax())
+    st.callout(
+        ax,
+        f"Largest single loss: -{funnel['dropped'].iloc[biggest]:,}.\n"
+        "Yahoo purges delisted tickers, so this is\nsurvivorship, not a modelling choice.",
+        xy=(funnel["n"].iloc[biggest], y[biggest]),
+        xytext=(funnel["n"].max() * 0.60, y[biggest] - 1.6),
+    )
+
+    st.titles(
+        fig,
+        "Two of every five listed IPOs reach the analysis sample",
+        f"From {full['n'].iloc[0]:,} calendar entries to "
+        f"{int(full.loc[full['step'].str.contains('target'), 'n'].iloc[0]):,} with a first-day "
+        f"return and {full['n'].iloc[-1]:,} with a prospectus. "
+        "Steps that remove nothing are omitted; red labels show what each requirement costs.",
+    )
+    return st.finish(fig, out / "12_sample_funnel.svg",
+                     source="Source: reports/tables/sample_funnel.csv.", as_of=AS_OF)
+
+
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT)
+    args = parser.parse_args()
+
+    if not SAMPLE_PATH.exists():
+        print(f"{SAMPLE_PATH} not found. Run scripts/build_dataset.py first.", file=sys.stderr)
+        return 1
+
+    st.apply_style()
+    out = args.out_dir
+    out.mkdir(parents=True, exist_ok=True)
+
+    df = pd.read_parquet(SAMPLE_PATH)
+    df["ipo_date"] = pd.to_datetime(df["ipo_date"])
+
+    written = [
+        fig_distribution(df, out),
+        fig_sector_counts(df, out),
+        fig_sector_year(df, out),
+        fig_sentiment(df, out),
+        fig_vix(df, out),
+        fig_correlations(df, out),
+        fig_litigious(df, out),
+        fig_disclosure(df, out),
+        fig_models(out),
+        fig_holdout(df, out),
+        fig_shap(out),
+        fig_funnel(out),
+    ]
+    for path in written:
+        print(f"  {path}  ({path.stat().st_size / 1024:.0f} KB)")
+    print(f"\n{len(written)} figures written to {out}/")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

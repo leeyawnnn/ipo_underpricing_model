@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="864pt" height="540pt" viewBox="0 0 864 540" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-09-18T00:05:48.120748</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.8.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 540 
+L 864 540 
+L 864 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 175.318 469.06 
+L 836.368876 469.06 
+L 836.368876 81.18 
+L 175.318 81.18 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 175.318 146.131964 
+L 640.846786 146.131964 
+L 640.846786 98.810909 
+L 175.318 98.810909 
+z
+" clip-path="url(#pe3765f491c)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 175.318 222.456246 
+L 629.2939 222.456246 
+L 629.2939 175.135191 
+L 175.318 175.135191 
+z
+" clip-path="url(#pe3765f491c)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 175.318 298.780527 
+L 361.477001 298.780527 
+L 361.477001 251.459473 
+L 175.318 251.459473 
+z
+" clip-path="url(#pe3765f491c)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 175.318 375.104809 
+L 355.175427 375.104809 
+L 355.175427 327.783754 
+L 175.318 327.783754 
+z
+" clip-path="url(#pe3765f491c)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 175.318 451.429091 
+L 299.774088 451.429091 
+L 299.774088 404.108036 
+L 175.318 404.108036 
+z
+" clip-path="url(#pe3765f491c)" style="fill: #0072b2"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 175.318 469.06 
+L 175.318 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_2">
+      <defs>
+       <path id="m6d6f4b3b8d" d="M 0 0 
+L 0 3.5 
+" style="stroke: #6b6b6b; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="175.318" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="175.318" y="483.200625" transform="rotate(-0 175.318 483.200625)">0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 306.600793 469.06 
+L 306.600793 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="306.600793" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="306.600793" y="483.200625" transform="rotate(-0 306.600793 483.200625)">500</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 437.883587 469.06 
+L 437.883587 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="437.883587" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="437.883587" y="483.200625" transform="rotate(-0 437.883587 483.200625)">1000</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 569.16638 469.06 
+L 569.16638 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="569.16638" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="569.16638" y="483.200625" transform="rotate(-0 569.16638 483.200625)">1500</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 700.449174 469.06 
+L 700.449174 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="700.449174" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="700.449174" y="483.200625" transform="rotate(-0 700.449174 483.200625)">2000</text>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_11">
+      <path d="M 831.731967 469.06 
+L 831.731967 81.18 
+" clip-path="url(#pe3765f491c)" style="fill: none; stroke: #d9d9d9; stroke-width: 0.7; stroke-linecap: round"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#m6d6f4b3b8d" x="831.731967" y="469.06" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="fill: #6b6b6b; font: 10px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="831.731967" y="483.200625" transform="rotate(-0 831.731967 483.200625)">2500</text>
+     </g>
+    </g>
+    <g id="text_7">
+     <text style="fill: #1a1a1a; font: 12px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: middle" x="505.843438" y="497.942187" transform="rotate(-0 505.843438 497.942187)">IPOs remaining (count)</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_13">
+      <defs>
+       <path id="m482d85e789" d="M 0 0 
+L -3.5 0 
+" style="stroke: #6b6b6b; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m482d85e789" x="175.318" y="122.471436" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_8">
+      <text style="fill: #6b6b6b; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="168.318" y="125.684718" transform="rotate(-0 168.318 125.684718)">IPOs in the 2019-2024 calendar</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#m482d85e789" x="175.318" y="198.795718" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <text style="fill: #6b6b6b; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="168.318" y="202.044859" transform="rotate(-0 168.318 202.044859)">with an offer price</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_15">
+      <g>
+       <use xlink:href="#m482d85e789" x="175.318" y="275.12" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_10">
+      <text style="fill: #6b6b6b; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="168.318" y="278.369141" transform="rotate(-0 168.318 278.369141)">with a recoverable first-day close</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_16">
+      <g>
+       <use xlink:href="#m482d85e789" x="175.318" y="351.444282" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_11">
+      <text style="fill: #6b6b6b; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="168.318" y="354.733501" transform="rotate(-0 168.318 354.733501)">and a SEC-assigned SIC code</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_17">
+      <g>
+       <use xlink:href="#m482d85e789" x="175.318" y="427.768564" style="fill: #6b6b6b; stroke: #6b6b6b; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_12">
+      <text style="fill: #6b6b6b; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="168.318" y="431.057782" transform="rotate(-0 168.318 431.057782)">and a recovered S-1/F-1 prospectus</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_8">
+    <path d="M 175.318 469.06 
+L 175.318 81.18 
+" style="fill: none; stroke: #6b6b6b; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 175.318 469.06 
+L 836.368876 469.06 
+" style="fill: none; stroke: #6b6b6b; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_13">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="646.846786" y="124.874015" transform="rotate(-0 646.846786 124.874015)">1,773   (100% of the calendar)</text>
+   </g>
+   <g id="text_14">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="635.2939" y="201.198296" transform="rotate(-0 635.2939 201.198296)">1,729   (98% of the calendar)</text>
+   </g>
+   <g id="text_15">
+    <text style="fill: #d55e00; font: 8px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="623.2939" y="171.203316" transform="rotate(-0 623.2939 171.203316)">-44</text>
+   </g>
+   <g id="text_16">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="367.477001" y="277.522578" transform="rotate(-0 367.477001 277.522578)">709   (40% of the calendar)</text>
+   </g>
+   <g id="text_17">
+    <text style="fill: #d55e00; font: 8px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="355.477001" y="247.527598" transform="rotate(-0 355.477001 247.527598)">-1,020</text>
+   </g>
+   <g id="text_18">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="361.175427" y="353.84686" transform="rotate(-0 361.175427 353.84686)">685   (39% of the calendar)</text>
+   </g>
+   <g id="text_19">
+    <text style="fill: #d55e00; font: 8px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="349.175427" y="323.851879" transform="rotate(-0 349.175427 323.851879)">-24</text>
+   </g>
+   <g id="text_20">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="305.774088" y="430.171142" transform="rotate(-0 305.774088 430.171142)">474   (27% of the calendar)</text>
+   </g>
+   <g id="text_21">
+    <text style="fill: #d55e00; font: 8px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: end" x="293.774088" y="400.176161" transform="rotate(-0 293.774088 400.176161)">-211</text>
+   </g>
+   <g id="patch_10">
+    <path d="M 510.287078 380.337355 
+Q 437.515781 328.883827 364.744483 277.430299 
+" style="fill: none; stroke: #6b6b6b; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_22">
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif" transform="translate(454.635271 389.917913)">Largest single loss: -1,020.</text>
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif" transform="translate(454.635271 399.511351)">Yahoo purges delisted tickers, so this is</text>
+    <text style="fill: #1a1a1a; font: 9px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif" transform="translate(454.635271 409.104788)">survivorship, not a modelling choice.</text>
+   </g>
+  </g>
+  <g id="text_23">
+   <text style="fill: #1a1a1a; font: 600 15px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="10.368" y="24.464062" transform="rotate(-0 10.368 24.464062)">Two of every five listed IPOs reach the analysis sample</text>
+  </g>
+  <g id="text_24">
+   <text style="fill: #6b6b6b; font: 11px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="10.368" y="36.72" transform="rotate(-0 10.368 36.72)">From 1,773 calendar entries to 709 with a first-day return and 474 with a prospectus. Steps that remove nothing are omitted; red labels show what each requirement costs.</text>
+  </g>
+  <g id="text_25">
+   <text style="fill: #6b6b6b; font: italic 8px 'Helvetica Neue', 'Helvetica', 'Arial', 'Liberation Sans', 'DejaVu Sans', sans-serif; text-anchor: start" x="10.368" y="532.44" transform="rotate(-0 10.368 532.44)">Source: reports/tables/sample_funnel.csv. Data as of 2026-09-17.  Generated by scripts/build_figures.py at commit 09bc1bd-dirty.</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pe3765f491c">
+   <rect x="175.318" y="81.18" width="661.050876" height="387.88"/>
+  </clipPath>
+ </defs>
+</svg>
