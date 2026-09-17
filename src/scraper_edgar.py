@@ -11,9 +11,10 @@ For each ticker in the IPO calendar, this module:
    section extracts to ``…/{ticker}_{date}_risk_factors.txt`` and
    ``…/{ticker}_{date}_mda.txt``.
 
-EDGAR rate-limit policy: ≤10 requests/second; we throttle to 8 r/s and use
-exponential backoff.  The User-Agent header includes a contact email as
-required by SEC Fair Access policy.
+EDGAR fair-access policy caps traffic at 10 requests/second and requires a
+descriptive User-Agent naming a contact. We throttle to 8 r/s, back off
+exponentially, and read the contact from the ``SEC_EDGAR_USER_AGENT``
+environment variable — the module refuses to run without one.
 
 Usage (CLI)::
 
@@ -23,6 +24,7 @@ Usage (CLI)::
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -45,11 +47,29 @@ S1_DIR = RAW_DIR / "s1_filings"
 CACHE_DIR = RAW_DIR / ".cache"
 IPO_CSV = RAW_DIR / "ipo_calendar.csv"
 
-# SEC requires a descriptive User-Agent: "<name> <email>"
-EDGAR_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; IPO-research-bot/1.0; contact: student@university.edu)",
-    "Accept-Encoding": "gzip, deflate",
-}
+def _user_agent() -> str:
+    """Return the SEC fair-access User-Agent, from the environment.
+
+    SEC fair access (https://www.sec.gov/os/webmaster-faq#developers) requires
+    a descriptive User-Agent naming a contactable address. This module used to
+    ship a placeholder, "student@university.edu", which is not a real contact
+    and risks the SEC blocking the traffic. We refuse to guess and require the
+    operator to declare their own.
+
+    Raises:
+        RuntimeError: If ``SEC_EDGAR_USER_AGENT`` is unset or has no address.
+    """
+    value = os.environ.get("SEC_EDGAR_USER_AGENT", "").strip()
+    if not value or "@" not in value:
+        raise RuntimeError(
+            "SEC_EDGAR_USER_AGENT is not set to a contactable address.\n"
+            'Set it, for example:\n'
+            '  export SEC_EDGAR_USER_AGENT="Jane Doe jane@example.com"'
+        )
+    return value
+
+
+EDGAR_HEADERS = {"Accept-Encoding": "gzip, deflate"}
 
 EDGAR_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 EDGAR_SEARCH_URL = (
@@ -73,6 +93,12 @@ SESSION = requests.Session()
 SESSION.headers.update(EDGAR_HEADERS)
 
 
+def _ensure_user_agent() -> None:
+    """Attach the fair-access User-Agent to the shared session, once."""
+    if "User-Agent" not in SESSION.headers or "@" not in str(SESSION.headers["User-Agent"]):
+        SESSION.headers["User-Agent"] = _user_agent()
+
+
 @retry(max_attempts=6, backoff_factor=2.5, initial_wait=1.5,
        exceptions=(requests.RequestException, OSError))
 @throttle(calls_per_second=8.0)
@@ -89,6 +115,7 @@ def _get(url: str, **kwargs) -> requests.Response:
     Raises:
         requests.HTTPError: On persistent 4xx/5xx errors.
     """
+    _ensure_user_agent()
     resp = SESSION.get(url, timeout=30, **kwargs)
     if resp.status_code == 429:
         retry_after = int(resp.headers.get("Retry-After", 10))
