@@ -1,0 +1,44 @@
+Empirical study of US IPO first-day returns, 2019-2024
+Copyright 2025-2026 Lyonn Lie
+
+This product includes software developed under the Apache License 2.0
+(see LICENSE).
+
+Third-party data redistributed in this repository
+-------------------------------------------------
+
+1. data/external/lm_sentiment_words.csv
+   Derived from the Loughran-McDonald Master Dictionary (1993-2025 release),
+   Software Repository for Accounting and Finance, University of Notre Dame.
+   https://sraf.nd.edu/loughranmcdonald-master-dictionary/
+   The dictionary and its sentiment word lists are free for use in academic
+   research; commercial use requires a licence from the authors
+   (loughranmcdonald@gmail.com). Only the word-to-category mapping for the
+   seven categories used here is redistributed, not the full master file.
+   Cite: Loughran, T., & McDonald, B. (2011), Journal of Finance 66(1), 35-65.
+
+2. data/external/underwriter_ranks.csv
+   Derived from "Underwriter-Rank.xls" published by Jay R. Ritter, University
+   of Florida. https://site.warrington.ufl.edu/ritter/ipo-data/
+   Reshaped to one row per underwriter and listing year; the underlying
+   Carter-Manaster scores are unchanged.
+   Cite: Carter, R. B., & Manaster, S. (1990), Journal of Finance 45(4),
+   1045-1067, with rankings updated by Loughran & Ritter (2004) and Ritter.
+
+3. data/external/company_sic_codes.csv and data/raw/market_indices.csv
+   SIC codes are US government works from the SEC's company submissions API
+   and are not subject to copyright. Market index closes are factual daily
+   observations retrieved from Yahoo Finance.
+
+Data NOT redistributed
+----------------------
+
+The stockanalysis.com IPO calendar is not committed. Their terms permit
+snippets with attribution but not republishing content in full, and the raw
+scrape is close to a verbatim copy of their tables. Regenerate it with
+src/scraper_ipo_calendar.py. The derived analysis dataset in data/processed/
+is a transformed research dataset joined against SEC and Yahoo Finance
+sources, not a copy of their table.
+
+SEC EDGAR filing text is a US government-hosted public disclosure and is not
+committed here only because of its size; src/scraper_edgar.py retrieves it.

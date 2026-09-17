@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+title: "Empirical study of US IPO first-day returns, 2019-2024"
+message: "If you refer to this work, please cite it as below."
+type: software
+authors:
+  - given-names: Lyonn
+    family-names: Lie
+    alias: leeyawnnn
+repository-code: "https://github.com/leeyawnnn/ipo_underpricing_model"
+abstract: >-
+  Measurement study of first-day returns on US IPOs listed between 2019 and
+  2024. Combines SEC EDGAR S-1/F-1 prospectus text scored with the
+  Loughran-McDonald dictionary, SEC-assigned SIC sectors, Carter-Manaster
+  underwriter reputation ranks from Jay Ritter, and split-corrected first-day
+  closes from Yahoo Finance. Reports a hypothesis-test family with
+  multiple-testing correction and out-of-sample model performance against
+  constant baselines.
+keywords:
+  - initial public offerings
+  - underpricing
+  - textual analysis
+  - Loughran-McDonald
+  - SEC EDGAR
+  - empirical finance
+license: Apache-2.0
+version: 0.2.0
+date-released: "2026-09-18"
