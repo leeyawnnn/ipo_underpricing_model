@@ -33,6 +33,7 @@ disk cache in ``data/raw/.cache/``.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -51,10 +52,16 @@ RAW_DIR = Path("data/raw")
 CACHE_DIR = RAW_DIR / ".cache"
 OUTPUT_CSV = RAW_DIR / "ipo_calendar.csv"
 
+# A descriptive User-Agent with a reachable contact, so the site operator can
+# get in touch rather than block an anonymous crawler. The contact comes from
+# SCRAPER_CONTACT; the placeholder that shipped here ("student@university.edu")
+# was not a real address.
+_CONTACT = os.environ.get("SCRAPER_CONTACT", "").strip()
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; IPO-research-bot/1.0; "
-        "academic project - contact: student@university.edu)"
+        "ipo-underpricing-research/1.0 (academic study of US IPO first-day returns"
+        + (f"; contact: {_CONTACT}" if _CONTACT else "")
+        + ")"
     ),
     "Accept": "text/html,application/xhtml+xml",
     "Accept-Language": "en-US,en;q=0.9",
