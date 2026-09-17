@@ -22,6 +22,7 @@ one-off scripts:
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -126,6 +127,11 @@ def git_commit() -> str:
 
 def apply_style() -> None:
     """Install the repository-wide matplotlib defaults. Idempotent."""
+    # The font stack degrades gracefully, but matplotlib logs a findfont
+    # warning for every text object when the chosen family has no semibold
+    # face. That is dozens of lines per figure and says nothing useful.
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+
     mpl.rcParams.update(
         {
             "figure.figsize": (FIG_WIDTH_IN, FIG_HEIGHT_IN),

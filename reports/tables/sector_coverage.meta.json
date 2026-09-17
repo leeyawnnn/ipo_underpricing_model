@@ -1,0 +1,26 @@
+{
+  "description": "Sector distribution over the full calendar, from SEC-assigned SIC codes",
+  "command": "python scripts/build_dataset.py",
+  "git_commit": "034a9d9-dirty",
+  "generated_utc": "2026-09-17T16:14:08+00:00",
+  "inputs": [
+    {
+      "path": "data/raw/ipo_calendar.csv",
+      "sha256": "3580df79f9e9c34a166eeb59b6837b16d3e2e2bdd40749709ff35f91c448e0e1"
+    },
+    {
+      "path": "data/raw/first_day_prices.csv",
+      "sha256": "ba3ceabaf98430eeac403d770bed6f358226c98304b73d1842e9eebc0de5774d"
+    },
+    {
+      "path": "data/external/company_sic_codes.csv",
+      "sha256": "8c9d03efcc096a94f834cbc5e40ff813333a3b5f324fbeec55dfd2052b03c0be"
+    },
+    {
+      "path": "data/raw/market_indices.csv",
+      "sha256": "013d5239c43955be1edf7689ab67f198a115029e8335713d1344ff70d6ae0267"
+    }
+  ],
+  "input_sha256": "3580df79f9e9c34a166eeb59b6837b16d3e2e2bdd40749709ff35f91c448e0e1",
+  "rows": 13
+}

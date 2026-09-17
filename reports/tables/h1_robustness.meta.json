@@ -1,0 +1,14 @@
+{
+  "description": "H1 re-estimated across subsamples and control sets",
+  "command": "python scripts/run_analysis.py",
+  "git_commit": "034a9d9-dirty",
+  "generated_utc": "2026-09-17T16:14:23+00:00",
+  "inputs": [
+    {
+      "path": "data/processed/analysis_sample.parquet",
+      "sha256": "3f4af26b6f8521f34f820139580f2b4b78583c3dc9aa548338b31475ae6105e1"
+    }
+  ],
+  "input_sha256": "3f4af26b6f8521f34f820139580f2b4b78583c3dc9aa548338b31475ae6105e1",
+  "rows": 15
+}

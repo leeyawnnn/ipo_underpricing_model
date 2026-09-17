@@ -31,7 +31,9 @@ ignore = [
 "tests/*" = ["E402"]
 
 [tool.mypy]
-python_version = "3.11"
+# No python_version pin: with it set to 3.11, mypy parses numpy's bundled
+# stubs under 3.11 rules and dies on their 3.12 `type` statements before
+# checking any of our code. Unpinned, it follows the running interpreter.
 files = ["src"]
 ignore_missing_imports = true
 warn_unused_configs = true

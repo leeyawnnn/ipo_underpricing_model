@@ -54,9 +54,9 @@ data/raw/.cache/
 # Fetched reference data (see scripts/fetch_lm_dictionary.py)
 data/external/lm_master_dictionary.csv
 
-# Generated reports
-reports/tables/*.json
-!reports/tables/.gitkeep
+# Generated reports: the tables and their provenance sidecars are committed,
+# because the README quotes them and a reader must be able to trace a number
+# back to the commit and input hash that produced it.
 
 # Coverage
 .coverage
