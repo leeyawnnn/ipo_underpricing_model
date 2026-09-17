@@ -1,0 +1,13 @@
+# Keep GitHub's language detection focused on the analysis code.
+data/**            linguist-vendored
+notebooks/**       linguist-documentation
+reports/**         linguist-generated
+*.ipynb            linguist-documentation
+
+# Text handling
+*.py      text eol=lf
+*.md      text eol=lf
+*.csv     text eol=lf
+*.yml     text eol=lf
+*.parquet binary
+*.png     binary
