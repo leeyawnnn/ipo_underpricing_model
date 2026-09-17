@@ -65,3 +65,6 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Superseded by data/external/lm_sentiment_words.csv (derived subset).
+data/external/lm_dictionary.csv

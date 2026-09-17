@@ -35,39 +35,41 @@ log = setup_logging(__name__)
 # LM Dictionary loading
 # ---------------------------------------------------------------------------
 
-LM_DICT_PATH = Path("data/external/lm_dictionary.csv")
+LM_WORDS_PATH = Path("data/external/lm_sentiment_words.csv")
 
-# Categories carried as 0/1 columns in the LM 2014/2018 master CSV.
-# The "Modal" column is special: it stores 1=Strong, 2=Moderate, 3=Weak.
-_LM_BINARY_CATEGORIES = {
-    "Negative": "lm_negative",
-    "Positive": "lm_positive",
-    "Uncertainty": "lm_uncertainty",
-    "Litigious": "lm_litigious",
-    "Constraining": "lm_constraining",
+# Column in lm_sentiment_words.csv -> feature-name stem used downstream.
+_LM_CATEGORY_COLUMNS = {
+    "negative": "lm_negative",
+    "positive": "lm_positive",
+    "uncertainty": "lm_uncertainty",
+    "litigious": "lm_litigious",
+    "constraining": "lm_constraining",
+    "strong_modal": "lm_modal_strong",
+    "weak_modal": "lm_modal_weak",
 }
 
 
-def load_lm_dictionary(path: Path = LM_DICT_PATH) -> dict[str, set[str]]:
-    """Load the Loughran-McDonald Master Dictionary.
+def load_lm_dictionary(path: Path = LM_WORDS_PATH) -> dict[str, set[str]]:
+    """Load the Loughran-McDonald sentiment word lists.
+
+    Reads ``data/external/lm_sentiment_words.csv``, the seven-category subset
+    derived from the LM Master Dictionary by ``scripts/fetch_lm_dictionary.py``.
+    The master itself (86,553 rows, 9 MB) is a download step: it carries
+    per-word corpus statistics this project never reads, and committing it
+    tripled the repository size.
 
     Source: Loughran, T., & McDonald, B. (2011). When Is a Liability Not a
-    Liability? Textual Analysis, Dictionaries, and 10-Ks. *Journal of
-    Finance*, 66(1), 35-65. Dictionary published at
-    https://sraf.nd.edu/loughranmcdonald-master-dictionary/.
-
-    The full master CSV (~85,000 entries) labels each word with binary
-    category flags (Negative, Positive, Uncertainty, Litigious,
-    Constraining) and a tri-valued Modal flag (1=Strong, 2=Moderate,
-    3=Weak). This loader handles both the modern column layout (single
-    Modal column) and the older layout (StrongModal/WeakModal columns).
+    Liability? Textual Analysis, Dictionaries, and 10-Ks. *Journal of Finance*,
+    66(1), 35-65. Dictionary published at
+    https://sraf.nd.edu/loughranmcdonald-master-dictionary/ and free for
+    academic research.
 
     Args:
-        path: Path to the LM Master Dictionary CSV.
+        path: Path to the derived word-list CSV.
 
     Returns:
         Dict mapping feature name (e.g. ``"lm_negative"``) to a set of
-        uppercase words. Categories: ``lm_negative``, ``lm_positive``,
+        uppercase words. Keys: ``lm_negative``, ``lm_positive``,
         ``lm_uncertainty``, ``lm_litigious``, ``lm_constraining``,
         ``lm_modal_strong``, ``lm_modal_weak``.
 
@@ -76,54 +78,22 @@ def load_lm_dictionary(path: Path = LM_DICT_PATH) -> dict[str, set[str]]:
     """
     if not path.exists():
         raise FileNotFoundError(
-            f"LM dictionary not found at {path}. "
-            "Download from https://sraf.nd.edu/loughranmcdonald-master-dictionary/ "
-            "and save to data/external/lm_dictionary.csv"
+            f"LM sentiment word list not found at {path}. "
+            "Run: python scripts/fetch_lm_dictionary.py"
         )
 
-    df = pd.read_csv(path, low_memory=False)
-    word_col = "Word" if "Word" in df.columns else \
-        [c for c in df.columns if c.lower() == "word"][0]
+    df = pd.read_csv(path)
+    words = df["word"].astype(str).str.upper()
 
     lm: dict[str, set[str]] = {}
-
-    # Standard binary categories
-    for csv_col, feature_name in _LM_BINARY_CATEGORIES.items():
-        if csv_col in df.columns:
-            words = set(
-                df.loc[df[csv_col] != 0, word_col]
-                .astype(str)
-                .str.upper()
-                .dropna()
-                .tolist()
-            )
-            lm[feature_name] = words
-            log.debug("LM %s: %d words", feature_name, len(words))
-
-    # Modal: column-based (new) or split columns (old)
-    if "Modal" in df.columns:
-        # 1=Strong, 2=Moderate, 3=Weak per LM Master Dictionary documentation
-        lm["lm_modal_strong"] = set(
-            df.loc[df["Modal"] == 1, word_col].astype(str).str.upper().dropna().tolist()
-        )
-        lm["lm_modal_weak"] = set(
-            df.loc[df["Modal"] == 3, word_col].astype(str).str.upper().dropna().tolist()
-        )
-    else:
-        if "StrongModal" in df.columns:
-            lm["lm_modal_strong"] = set(
-                df.loc[df["StrongModal"] != 0, word_col]
-                .astype(str).str.upper().dropna().tolist()
-            )
-        if "WeakModal" in df.columns:
-            lm["lm_modal_weak"] = set(
-                df.loc[df["WeakModal"] != 0, word_col]
-                .astype(str).str.upper().dropna().tolist()
-            )
+    for column, feature_name in _LM_CATEGORY_COLUMNS.items():
+        if column not in df.columns:
+            raise ValueError(f"{path} is missing expected column {column!r}")
+        lm[feature_name] = set(words[df[column] != 0])
 
     log.info(
         "LM dictionary loaded from %s: %s",
-        path, {k: len(v) for k, v in lm.items()}
+        path, {k: len(v) for k, v in lm.items()},
     )
     return lm
 

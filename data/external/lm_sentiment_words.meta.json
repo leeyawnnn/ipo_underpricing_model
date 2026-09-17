@@ -1,0 +1,18 @@
+{
+  "source_page": "https://sraf.nd.edu/loughranmcdonald-master-dictionary/",
+  "source_file": "Loughran-McDonald_MasterDictionary_1993-2025.csv",
+  "source_sha256": "e2d1328682bab7d2187684fb9f5420bb730401c9eefc00daf835edd203f4859d",
+  "access_date": "2026-09-17",
+  "derived_by": "python scripts/fetch_lm_dictionary.py",
+  "n_words": 3876,
+  "category_counts": {
+    "negative": 2355,
+    "positive": 354,
+    "uncertainty": 297,
+    "litigious": 905,
+    "constraining": 184,
+    "strong_modal": 19,
+    "weak_modal": 27
+  },
+  "licence": "Free for academic research; commercial use requires a licence from the authors (loughranmcdonald@gmail.com)."
+}
