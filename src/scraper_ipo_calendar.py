@@ -196,9 +196,9 @@ def _normalise(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = (
                 df[col]
-                .astype(str)
+                .astype("str")
                 .str.replace(r"[$,%\s]", "", regex=True)
-                .replace("", float("nan"))
+                .replace("", None)
                 .pipe(pd.to_numeric, errors="coerce")
             )
 

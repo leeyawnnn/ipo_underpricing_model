@@ -81,7 +81,7 @@ def load_lm_dictionary(path: Path = LM_WORDS_PATH) -> dict[str, set[str]]:
         )
 
     df = pd.read_csv(path)
-    words = df["word"].astype(str).str.upper()
+    words = df["word"].astype("str").str.upper()
 
     lm: dict[str, set[str]] = {}
     for column, feature_name in _LM_CATEGORY_COLUMNS.items():

@@ -510,7 +510,7 @@ def _ols_litigious(
             axis=1,
         )
     design = sm.add_constant(design)
-    outcome = frame[target_col].astype(float)
+    outcome = frame[target_col].astype("float64")
     if winsorise:
         outcome = outcome.clip(*outcome.quantile([0.01, 0.99]))
     # Heteroscedasticity-robust: first-day returns are strongly non-normal.
@@ -1028,7 +1028,7 @@ def run_all(df: pd.DataFrame, alpha: float = ALPHA) -> dict[str, Any]:
         Dict with each test's results under ``H1`` .. ``H6``, an ``adjusted``
         DataFrame of raw and corrected p-values, and ``h1_robustness``.
     """
-    results = {
+    results: dict[str, Any] = {
         "H1": test_h1_litigious_tone(df, alpha=alpha),
         "H2": test_h2_underwriter_translation(df, alpha=alpha),
         "H3": test_h3_disclosure_concentration(df, alpha=alpha),

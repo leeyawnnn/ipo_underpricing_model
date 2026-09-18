@@ -477,7 +477,7 @@ def fit_final_lightgbm(
 
 def shap_summary(
     pipeline: Pipeline, data: pd.DataFrame, features: FeatureSet
-) -> tuple[Any, pd.DataFrame, np.ndarray]:
+) -> tuple[Any, pd.DataFrame, pd.DataFrame]:
     """Compute SHAP values for the fitted LightGBM pipeline.
 
     SHAP explains the model, not the data-generating process. When the model's

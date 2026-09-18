@@ -64,7 +64,10 @@ def load_market(path: Path = MARKET_PATH) -> pd.DataFrame:
         ``nasdaq_30d_return`` and ``nasdaq_30d_volatility``.
     """
     market = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
-    log_ret = np.log(market["nasdaq_close"] / market["nasdaq_close"].shift(1))
+    log_ret = pd.Series(
+        np.log(market["nasdaq_close"] / market["nasdaq_close"].shift(1)),
+        index=market.index,
+    )
     market["nasdaq_30d_return"] = log_ret.rolling(30).sum()
     market["nasdaq_30d_volatility"] = log_ret.rolling(30).std() * np.sqrt(252)
     return market
@@ -160,7 +163,7 @@ def expanding_hot_market(
 def load_calendar(path: Path = CALENDAR_PATH) -> pd.DataFrame:
     """Load and de-duplicate the IPO calendar."""
     calendar = pd.read_csv(path, parse_dates=["ipo_date"])
-    calendar["ticker"] = calendar["ticker"].astype(str).str.strip().str.upper()
+    calendar["ticker"] = calendar["ticker"].astype("str").str.strip().str.upper()
     calendar = calendar[CALENDAR_COLUMNS].copy()
     calendar["offer_price"] = pd.to_numeric(calendar["offer_price"], errors="coerce")
     before = len(calendar)
@@ -212,7 +215,7 @@ def assemble(
     df = load_calendar(calendar_path)
 
     prices = pd.read_csv(prices_path)
-    prices["ticker"] = prices["ticker"].astype(str).str.upper()
+    prices["ticker"] = prices["ticker"].astype("str").str.upper()
     prices["ipo_date"] = pd.to_datetime(prices["ipo_date"])
     keep = [
         "ticker",
@@ -232,7 +235,7 @@ def assemble(
     )
 
     sic = pd.read_csv(sic_path, dtype={"sic": "string", "cik": "string"})
-    sic["ticker"] = sic["ticker"].astype(str).str.upper()
+    sic["ticker"] = sic["ticker"].astype("str").str.upper()
     from src.sic_sectors import UNCLASSIFIED, sector_for_sic
 
     sic["sector"] = sic["sic"].map(sector_for_sic)

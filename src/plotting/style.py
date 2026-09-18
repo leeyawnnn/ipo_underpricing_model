@@ -24,12 +24,13 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 from cycler import cycler
 from matplotlib.colors import TwoSlopeNorm
 from matplotlib.ticker import FuncFormatter
@@ -203,7 +204,7 @@ def diverging_norm(vmin: float, vmax: float, center: float = 0.0) -> TwoSlopeNor
 
 
 def bootstrap_ci(
-    values: Sequence[float],
+    values: npt.ArrayLike,
     statistic: Callable[[np.ndarray], float] = np.median,
     n_boot: int = 5_000,
     alpha: float = 0.05,
@@ -212,7 +213,8 @@ def bootstrap_ci(
     """Return ``(point, lower, upper)`` for a statistic by percentile bootstrap.
 
     Args:
-        values: Sample to resample.
+        values: Sample to resample. Any 1-D array-like: a list, a numpy array
+            or a pandas Series.
         statistic: Function applied to each resample. Defaults to the median.
         n_boot: Number of bootstrap resamples.
         alpha: Two-sided error rate; 0.05 gives a 95% interval.
@@ -222,7 +224,8 @@ def bootstrap_ci(
         ``(point estimate, lower bound, upper bound)``. Bounds are ``nan``
         when fewer than three finite observations are supplied.
     """
-    arr = np.asarray([v for v in values if np.isfinite(v)], dtype=float)
+    raw = np.asarray(values, dtype=float).ravel()
+    arr = raw[np.isfinite(raw)]
     if arr.size == 0:
         return float("nan"), float("nan"), float("nan")
     point = float(statistic(arr))
@@ -237,8 +240,8 @@ def bootstrap_ci(
 
 
 def spearman_ci(
-    x: Sequence[float],
-    y: Sequence[float],
+    x: npt.ArrayLike,
+    y: npt.ArrayLike,
     n_boot: int = 5_000,
     alpha: float = 0.05,
     seed: int = 20240517,

@@ -166,7 +166,12 @@ def cumulative_split_factor(
 
     if closes is not None:
         applicable = applicable[
-            [split_is_applied(closes, date, ratio) for date, ratio in applicable.items()]
+            [
+                split_is_applied(closes, date, ratio)
+                # Series.items() widens the key to Hashable; this index is
+                # always a DatetimeIndex, whose elements are Timestamps.
+                for date, ratio in zip(pd.DatetimeIndex(applicable.index), applicable, strict=True)
+            ]
         ]
     if applicable.empty:
         return 1.0
@@ -349,7 +354,8 @@ def run_price_scraper(
 
     records = []
     for i, (_, row) in enumerate(ipos.iterrows(), start=1):
-        offer = pd.to_numeric(row.get("offer_price"), errors="coerce")
+        offer_raw = row.get("offer_price")
+        offer = pd.to_numeric(offer_raw, errors="coerce") if offer_raw is not None else float("nan")
         rec = fetch_first_day_prices(
             str(row["ticker"]).strip().upper(),
             pd.Timestamp(row["ipo_date"]),
