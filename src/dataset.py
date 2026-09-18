@@ -296,12 +296,16 @@ def sample_funnel(df: pd.DataFrame) -> pd.DataFrame:
             int((df["underpricing"].notna() & (df["has_filing"] == 1)).sum()),
         ),
         (
-            "and a Risk Factors section extracted",
+            # A non-empty section, not merely a file: extract_sections writes
+            # an empty placeholder when a prospectus carries too few
+            # page-break markers to locate its headings.
+            "and a Risk Factors section located",
             int(
                 (
                     df["underpricing"].notna()
-                    & df["risk_factors_path"].notna()
-                    & df["risk_factors_path"].fillna("").map(lambda p: bool(p) and Path(p).exists())
+                    & df["risk_factors_path"]
+                    .fillna("")
+                    .map(lambda p: bool(p) and Path(p).exists() and Path(p).stat().st_size > 0)
                 ).sum()
             ),
         ),

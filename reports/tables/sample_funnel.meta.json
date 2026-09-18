@@ -1,8 +1,8 @@
 {
   "description": "IPOs surviving each data requirement, in the order applied",
   "command": "python scripts/build_dataset.py",
-  "git_commit": "034a9d9-dirty",
-  "generated_utc": "2026-09-17T16:14:08+00:00",
+  "git_commit": "c2f2471-dirty",
+  "generated_utc": "2026-09-17T17:05:15+00:00",
   "inputs": [
     {
       "path": "data/raw/ipo_calendar.csv",

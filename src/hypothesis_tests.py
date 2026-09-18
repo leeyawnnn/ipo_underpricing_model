@@ -306,6 +306,40 @@ def h1_robustness(
         add_spearman(f"Listing year {int(year)}", df[df["ipo_year"] == year])
 
     # Multivariate specifications. Each adds one layer of control.
+    # Rank-based multivariate checks. The bivariate estimate is a rank
+    # correlation, so the natural multivariate analogue is a partial rank
+    # correlation, not an OLS slope on a target with a +4,950% maximum.
+    base_controls = [
+        "log_offer_price",
+        "log_offer_size",
+        "vix_at_pricing",
+        "nasdaq_30d_return",
+        "max_underwriter_rank",
+    ]
+    for label, controls_ in [
+        ("Partial rank: controlling for log document length", ["log_prospectus_words"]),
+        ("Partial rank: + deal and market controls", ["log_prospectus_words", *base_controls]),
+    ]:
+        rows.append(
+            {
+                "specification": label,
+                **_partial_spearman(df, lit_col, target_col, controls_),
+                "kind": "partial_spearman",
+            }
+        )
+
+    # The multivariate row above drops every observation missing a control,
+    # so a weaker estimate there could be the controls or could be the smaller
+    # sample. This is the same bivariate estimate on exactly those rows, which
+    # separates the two.
+    multivariate_columns = [
+        c for c in [target_col, lit_col, "log_prospectus_words", *base_controls] if c in df.columns
+    ]
+    add_spearman(
+        "Baseline on the multivariate subsample",
+        df.dropna(subset=multivariate_columns),
+    )
+
     specs: list[tuple[str, list[str], bool, bool]] = [
         ("OLS: litigious only", [], False, False),
         (
@@ -358,7 +392,73 @@ def h1_robustness(
         result = _ols_litigious(df, target_col, lit_col, controls, sector_fe, year_fe)
         rows.append({"specification": label, **result, "kind": "ols_beta"})
 
+    # The same specifications on a winsorised target, which is where an OLS
+    # slope on this data becomes interpretable at all.
+    for label, controls, sector_fe, year_fe in specs[1:]:
+        result = _ols_litigious(
+            df, target_col, lit_col, controls, sector_fe, year_fe, winsorise=True
+        )
+        rows.append(
+            {
+                "specification": f"{label} [winsorised target]",
+                **result,
+                "kind": "ols_beta_winsorised",
+            }
+        )
+
     return pd.DataFrame(rows)
+
+
+def _partial_spearman(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    controls: list[str],
+) -> dict[str, float]:
+    """Spearman partial correlation of *x* and *y* given *controls*.
+
+    Rank-transforms every variable, regresses x and y on the controls, and
+    correlates the residuals. This keeps the rank basis that makes the
+    bivariate estimate meaningful on a target this heavy-tailed, while still
+    removing the controls' linear contribution.
+    """
+    usable = [c for c in controls if c in df.columns and df[c].nunique(dropna=True) > 1]
+    frame = df[[x, y, *usable]].dropna()
+    if len(frame) < 40:
+        return {
+            "n": len(frame),
+            "estimate": np.nan,
+            "ci_low": np.nan,
+            "ci_high": np.nan,
+            "p_value": np.nan,
+        }
+
+    ranked = frame.rank()
+    design = sm.add_constant(ranked[usable].astype(float)) if usable else None
+    if design is None:
+        rho, lo, hi = spearman_ci(frame[x], frame[y])
+        _, p = stats.spearmanr(frame[x], frame[y])
+        return {"n": len(frame), "estimate": rho, "ci_low": lo, "ci_high": hi, "p_value": float(p)}
+
+    x_resid = sm.OLS(ranked[x].astype(float), design).fit().resid
+    y_resid = sm.OLS(ranked[y].astype(float), design).fit().resid
+    rho, p = stats.pearsonr(x_resid, y_resid)
+
+    # Fisher z interval, with the usual partial-correlation degrees of freedom.
+    n, k = len(frame), len(usable)
+    if n - k - 3 <= 0:
+        lo = hi = float("nan")
+    else:
+        z = np.arctanh(np.clip(rho, -0.999999, 0.999999))
+        se = 1.0 / np.sqrt(n - k - 3)
+        lo, hi = np.tanh(z - 1.96 * se), np.tanh(z + 1.96 * se)
+    return {
+        "n": n,
+        "estimate": float(rho),
+        "ci_low": float(lo),
+        "ci_high": float(hi),
+        "p_value": float(p),
+    }
 
 
 def _ols_litigious(
@@ -368,8 +468,16 @@ def _ols_litigious(
     controls: list[str],
     sector_fe: bool,
     year_fe: bool,
+    winsorise: bool = False,
 ) -> dict[str, float]:
-    """Fit one OLS specification and return the litigious coefficient."""
+    """Fit one OLS specification and return the litigious coefficient.
+
+    Args:
+        winsorise: Clip the target at its 1st and 99th percentiles first. On a
+            target whose maximum is +4,950%, an unclipped OLS is a description
+            of two or three observations, which is why the unclipped rows
+            below are insignificant even where the rank association is not.
+    """
     usable = [c for c in controls if c in df.columns and df[c].nunique(dropna=True) > 1]
     columns = [target_col, lit_col, *usable]
     frame = df[columns].copy()
@@ -402,8 +510,11 @@ def _ols_litigious(
             axis=1,
         )
     design = sm.add_constant(design)
+    outcome = frame[target_col].astype(float)
+    if winsorise:
+        outcome = outcome.clip(*outcome.quantile([0.01, 0.99]))
     # Heteroscedasticity-robust: first-day returns are strongly non-normal.
-    model = sm.OLS(frame[target_col].astype(float), design).fit(cov_type="HC3")
+    model = sm.OLS(outcome, design).fit(cov_type="HC3")
     ci = model.conf_int().loc[lit_col]
     return {
         "n": int(model.nobs),

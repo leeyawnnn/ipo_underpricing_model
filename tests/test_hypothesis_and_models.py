@@ -292,7 +292,26 @@ def test_h1_robustness_covers_the_required_specifications(analysis_sample):
     assert any(s.startswith("Listing year") for s in specifications)
     assert "OLS: + log document length" in specifications
     assert "OLS: + sector and year fixed effects" in specifications
-    assert set(table["kind"]) == {"spearman", "ols_beta"}
+    # Rank-based multivariate rows, and the subsample-matched baseline that
+    # separates "the controls absorb the effect" from "the sample got smaller".
+    assert "Partial rank: controlling for log document length" in specifications
+    assert "Partial rank: + deal and market controls" in specifications
+    assert "Baseline on the multivariate subsample" in specifications
+    assert set(table["kind"]) == {
+        "spearman",
+        "partial_spearman",
+        "ols_beta",
+        "ols_beta_winsorised",
+    }
+
+    # The subsample-matched baseline must use exactly the rows the
+    # multivariate row uses, or it cannot separate "the controls absorb the
+    # effect" from "the sample got smaller".
+    by_specification = table.set_index("specification")["n"]
+    assert (
+        by_specification["Partial rank: + deal and market controls"]
+        == by_specification["Baseline on the multivariate subsample"]
+    )
     finite = table.dropna(subset=["estimate"])
     assert (finite["ci_low"] <= finite["estimate"]).all()
     assert (finite["estimate"] <= finite["ci_high"]).all()

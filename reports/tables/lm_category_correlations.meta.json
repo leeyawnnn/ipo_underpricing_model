@@ -1,14 +1,14 @@
 {
   "description": "Spearman rho between each LM category and the first-day return",
   "command": "python scripts/run_analysis.py",
-  "git_commit": "034a9d9-dirty",
-  "generated_utc": "2026-09-17T16:14:23+00:00",
+  "git_commit": "c2f2471-dirty",
+  "generated_utc": "2026-09-17T17:05:30+00:00",
   "inputs": [
     {
       "path": "data/processed/analysis_sample.parquet",
-      "sha256": "3f4af26b6f8521f34f820139580f2b4b78583c3dc9aa548338b31475ae6105e1"
+      "sha256": "ca40ce593e49621b4b534e6b5703af5595847b0a809b2358e3e499d22d6396ac"
     }
   ],
-  "input_sha256": "3f4af26b6f8521f34f820139580f2b4b78583c3dc9aa548338b31475ae6105e1",
+  "input_sha256": "ca40ce593e49621b4b534e6b5703af5595847b0a809b2358e3e499d22d6396ac",
   "rows": 7
 }
